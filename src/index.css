@@ -1,0 +1,1262 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   BASE STYLES - Responsive & Mobile-First
+   ============================================ */
+@layer base {
+  * {
+    @apply box-border;
+  }
+  
+  html {
+    @apply scroll-smooth;
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  
+  body {
+    @apply min-h-screen w-full overflow-x-hidden bg-white;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Ensure images and media are responsive */
+  img, picture, video, canvas, svg {
+    @apply max-w-full h-auto block;
+  }
+  
+  /* Responsive Typography */
+  h1 {
+    @apply text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold;
+  }
+  
+  h2 {
+    @apply text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold;
+  }
+  
+  h3 {
+    @apply text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold;
+  }
+  
+  h4 {
+    @apply text-base sm:text-lg md:text-xl lg:text-2xl font-semibold;
+  }
+  
+  /* Better text wrapping */
+  p, span, div {
+    @apply break-words;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  /* Focus styles for accessibility */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    @apply outline-none ring-2 ring-blue-500 ring-offset-2;
+  }
+  
+  /* Remove default button styling */
+  button {
+    @apply cursor-pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Ensure inputs are touch-friendly */
+  input, select, textarea, button {
+    @apply min-h-[44px];
+  }
+}
+
+/* ============================================
+   COMPONENT UTILITIES
+   ============================================ */
+@layer components {
+  /* Glassmorphism Navbar */
+  .navbar-glass {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 24px 0 rgba(31, 38, 135, 0.1);
+  }
+  
+  /* Responsive Container */
+  .container-responsive {
+    @apply w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10;
+    max-width: 1440px;
+  }
+  
+  /* Responsive Grid */
+  .grid-responsive {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8;
+  }
+  
+  /* Responsive Padding */
+  .padding-responsive {
+    @apply p-4 sm:p-6 md:p-8 lg:p-10;
+  }
+  
+  /* Responsive Text */
+  .text-responsive {
+    @apply text-sm sm:text-base md:text-lg;
+  }
+  
+/* Touch-Friendly Buttons - Minimum 44px for mobile */
+  .btn-responsive {
+    @apply min-h-[44px] min-w-[44px] px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold transition-all duration-300 touch-manipulation;
+  }
+
+  .btn-sm-responsive {
+    @apply min-h-[40px] px-3 sm:px-4 py-1.5 sm:py-2 rounded font-medium text-xs sm:text-sm;
+  }
+
+  /* Touch Target Padding */
+  .touch-target {
+    @apply p-3 sm:p-4 min-h-[44px];
+  }
+
+  /* Safe Area Padding for notched devices */
+  .safe-area-pad-x {
+    @apply px-safe-left px-safe-right;
+  }
+
+  .safe-area-pad-y {
+    @apply py-safe-top py-safe-bottom;
+  }
+
+  /* Card with hover effect */
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
+  }
+
+  /* Card responsive padding */
+  .card-padding {
+    @apply p-3 xs:p-4 sm:p-5 md:p-6 lg:p-8;
+  }
+
+  /* Smooth transitions */
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .transition-snappy {
+    transition: all 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+
+  /* Mobile-first responsive spacing */
+  .gap-responsive {
+    @apply gap-3 xs:gap-4 sm:gap-5 md:gap-6 lg:gap-8;
+  }
+
+  .px-responsive {
+    @apply px-3 xs:px-4 sm:px-6 md:px-8 lg:px-10;
+  }
+
+  .py-responsive {
+    @apply py-2 xs:py-3 sm:py-4 md:py-6 lg:py-8;
+  }
+
+  /* Responsive margin */
+  .mx-responsive {
+    @apply mx-2 xs:mx-3 sm:mx-4 md:mx-6 lg:mx-8;
+  }
+
+  .my-responsive {
+    @apply my-2 xs:my-3 sm:my-4 md:my-6 lg:my-8;
+  }
+
+  /* Mobile-optimized spacing for sections */
+  .section-spacing {
+    @apply py-6 xs:py-8 sm:py-12 md:py-16 lg:py-20;
+  }
+
+  .section-padding {
+    @apply px-3 xs:px-4 sm:px-6 md:px-8;
+  }
+
+  /* Responsive text sizing */
+  .text-xs-responsive {
+    @apply text-xs sm:text-sm;
+  }
+
+  .text-sm-responsive {
+    @apply text-sm sm:text-base;
+  }
+
+  .text-base-responsive {
+    @apply text-base sm:text-lg;
+  }
+
+  .text-lg-responsive {
+    @apply text-lg sm:text-xl md:text-2xl;
+  }
+
+  .text-xl-responsive {
+    @apply text-xl sm:text-2xl md:text-3xl lg:text-4xl;
+  }
+
+  /* Responsive grid layouts */
+  .grid-auto-responsive {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+  }
+
+  .grid-2col-responsive {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2;
+  }
+
+  .grid-3col-responsive {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+  }
+
+  /* Horizontal scroll wrapper for tables on mobile */
+  .table-responsive {
+    @apply w-full overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-responsive-hide {
+    @apply hidden md:table;
+  }
+
+  /* Full-width on mobile */
+  .full-mobile {
+    @apply w-full sm:w-auto;
+  }
+  
+  /* Elegant fonts */
+  .font-elegant {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+  
+  /* Line clamp utilities (for text truncation) */
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* ============================================
+     RESPONSIVE MODAL & DIALOG COMPONENTS
+     ============================================ */
+  
+  /* Full-screen modal on mobile, centered on desktop */
+  .modal-responsive {
+    @apply fixed inset-0 z-50 flex items-end sm:items-center justify-center;
+  }
+
+  .modal-content-responsive {
+    @apply w-full sm:w-auto sm:max-w-lg md:max-w-xl lg:max-w-2xl;
+    @apply max-h-[90vh] sm:max-h-[85vh];
+    @apply rounded-t-2xl sm:rounded-2xl;
+    @apply overflow-y-auto;
+  }
+
+  /* Bottom sheet style for mobile */
+  .bottom-sheet {
+    @apply fixed inset-x-0 bottom-0 z-50;
+    @apply rounded-t-2xl bg-white shadow-2xl;
+    @apply max-h-[90vh] overflow-y-auto;
+    @apply transform transition-transform duration-300;
+  }
+
+  /* Responsive form layouts */
+  .form-responsive {
+    @apply space-y-4 sm:space-y-6;
+  }
+
+  .form-row {
+    @apply flex flex-col sm:flex-row gap-3 sm:gap-4;
+  }
+
+  .form-field {
+    @apply flex-1 min-w-0;
+  }
+
+  /* Responsive input sizing */
+  .input-responsive {
+    @apply w-full px-3 sm:px-4 py-2.5 sm:py-3;
+    @apply text-sm sm:text-base;
+    @apply rounded-lg sm:rounded-xl;
+    @apply border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200;
+  }
+
+  /* ============================================
+     RESPONSIVE IMAGE & MEDIA COMPONENTS
+     ============================================ */
+
+  /* Responsive aspect ratio containers */
+  .aspect-responsive-video {
+    @apply aspect-video;
+  }
+
+  .aspect-responsive-square {
+    @apply aspect-square;
+  }
+
+  .aspect-responsive-poster {
+    aspect-ratio: 2/3;
+  }
+
+  /* Image container with proper sizing */
+  .img-container-responsive {
+    @apply relative overflow-hidden;
+    @apply w-full;
+  }
+
+  .img-cover {
+    @apply w-full h-full object-cover;
+  }
+
+  .img-contain {
+    @apply w-full h-full object-contain;
+  }
+
+  /* ============================================
+     RESPONSIVE NAVIGATION COMPONENTS
+     ============================================ */
+
+  /* Responsive nav items */
+  .nav-item-responsive {
+    @apply flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5;
+    @apply text-sm sm:text-base font-medium;
+    @apply rounded-lg transition-colors;
+  }
+
+  /* Mobile menu overlay */
+  .mobile-menu-overlay {
+    @apply fixed inset-0 z-40 bg-black/50 backdrop-blur-sm;
+    @apply lg:hidden;
+  }
+
+  /* Mobile slide-out menu */
+  .mobile-menu-panel {
+    @apply fixed inset-y-0 right-0 z-50 w-[85vw] max-w-sm;
+    @apply bg-white shadow-2xl;
+    @apply transform transition-transform duration-300;
+    @apply lg:hidden;
+  }
+
+  /* ============================================
+     RESPONSIVE TABLE COMPONENTS
+     ============================================ */
+
+  /* Responsive table container */
+  .table-container-responsive {
+    @apply w-full overflow-x-auto;
+    @apply -mx-4 sm:mx-0 px-4 sm:px-0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Card-based table for mobile */
+  .table-cards-mobile {
+    @apply block md:hidden space-y-3;
+  }
+
+  .table-card-item {
+    @apply bg-white rounded-lg border border-gray-200 p-4 shadow-sm;
+  }
+
+  /* Traditional table for desktop */
+  .table-desktop {
+    @apply hidden md:table w-full;
+  }
+
+  /* ============================================
+     RESPONSIVE GRID LAYOUTS
+     ============================================ */
+
+  /* Event cards grid */
+  .events-grid {
+    @apply grid gap-4 sm:gap-6;
+    @apply grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+  }
+
+  /* Gallery masonry grid */
+  .gallery-grid {
+    @apply grid gap-2 sm:gap-3 md:gap-4;
+    @apply grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5;
+  }
+
+  /* Dashboard stats grid */
+  .stats-grid {
+    @apply grid gap-3 sm:gap-4 md:gap-6;
+    @apply grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5;
+  }
+
+  /* Feature cards grid */
+  .features-grid {
+    @apply grid gap-4 sm:gap-6 lg:gap-8;
+    @apply grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+  }
+}
+
+/* ============================================
+   CUSTOM UTILITIES
+   ============================================ */
+@layer utilities {
+  /* Touch manipulation for better mobile interaction */
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+  
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Custom scrollbar styling */
+  .scrollbar-custom {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(59, 130, 246, 0.5) rgba(229, 231, 235, 0.5);
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar-track {
+    background: rgba(229, 231, 235, 0.5);
+    border-radius: 4px;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.5);
+    border-radius: 4px;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+    background: rgba(59, 130, 246, 0.8);
+  }
+  
+  /* Prevent text selection (useful for buttons/interactive elements) */
+  .no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  /* GPU acceleration for smooth animations */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+  }
+
+  /* Seamless horizontal scroll animation utility used by the overlay footer */
+  .animate-scroll-seamless {
+    /* Moves the element from right to left across its container */
+    animation: scroll-left 50s linear infinite;
+    will-change: transform;
+    /* Ensure the animated container is rendered on the compositor for smoothness */
+    transform: translateZ(0);
+  }
+}
+
+/* ============================================
+   ANIMATIONS & KEYFRAMES
+   ============================================ */
+@keyframes float {
+  0%, 100% { 
+    transform: translateY(0px);
+  }
+  50% { 
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes glow {
+  0% { 
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+  }
+  100% { 
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+    opacity: 1;
+  }
+  50% { 
+    box-shadow: 0 0 25px rgba(59, 130, 246, 1);
+    opacity: 0.8;
+  }
+}
+
+@keyframes scroll-left {
+  0% { 
+    transform: translateX(0%);
+  }
+  100% { 
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes fade-pulse {
+  0%, 100% { 
+    opacity: 0.6;
+  }
+  50% { 
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-right {
+  0% { 
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  100% { 
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-left {
+  0% { 
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  100% { 
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-up {
+  0% { 
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  100% { 
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-down {
+  0% { 
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  100% { 
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  0% { 
+    opacity: 0;
+  }
+  100% { 
+    opacity: 1;
+  }
+}
+
+/* Animated gradient stripes used by upload progress bar */
+@keyframes progressStripes {
+  0% {
+    background-position: 0% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes scale-in {
+  0% { 
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  100% { 
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes bounce-subtle {
+  0%, 100% { 
+    transform: translateY(0);
+  }
+  50% { 
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shake {
+  0%, 100% { 
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% { 
+    transform: translateX(-10px);
+  }
+  20%, 40%, 60%, 80% { 
+    transform: translateX(10px);
+  }
+}
+
+@keyframes wiggle {
+  0%, 100% { 
+    transform: rotate(-3deg);
+  }
+  50% { 
+    transform: rotate(3deg);
+  }
+}
+
+/* ============================================
+   RESPONSIVE MEDIA QUERIES
+   ============================================ */
+
+/* Extra small devices (phones, less than 640px) */
+@media (max-width: 639px) {
+  html {
+    font-size: 14px;
+  }
+  
+  /* Improve touch targets on mobile */
+  button, a, input, select, textarea {
+    @apply min-h-[44px];
+  }
+  
+  /* Better spacing for mobile modals */
+  .modal-content {
+    @apply mx-2 max-h-[90vh];
+  }
+  
+  /* Responsive tables - horizontal scroll */
+  .table-responsive {
+    @apply overflow-x-auto -mx-4 px-4;
+  }
+
+  /* Mobile-optimized cards */
+  .card-responsive {
+    @apply rounded-lg shadow-sm;
+  }
+
+  /* Compact form inputs on mobile */
+  .input-mobile {
+    @apply text-base py-3 px-4;
+  }
+
+  /* Mobile navigation spacing */
+  .nav-mobile-spacing {
+    @apply px-3 py-2;
+  }
+
+  /* Stack buttons on mobile */
+  .btn-stack-mobile {
+    @apply flex-col w-full space-y-2;
+  }
+
+  /* Full-width modals on mobile */
+  .modal-mobile {
+    @apply w-[95vw] max-w-none mx-auto;
+  }
+
+  /* Compact headers on mobile */
+  .header-compact {
+    @apply text-xl py-4;
+  }
+}
+
+/* Small devices (landscape phones, 640px and up) */
+@media (min-width: 640px) {
+  html {
+    font-size: 15px;
+  }
+
+  .card-responsive {
+    @apply rounded-xl shadow-md;
+  }
+}
+
+/* Medium devices (tablets, 768px and up) */
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+
+  /* Better grid layouts for tablets */
+  .grid-tablet-2col {
+    @apply grid-cols-2;
+  }
+
+  /* Horizontal button groups */
+  .btn-stack-mobile {
+    @apply flex-row w-auto space-y-0 space-x-3;
+  }
+}
+
+/* Large devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  html {
+    font-size: 16px;
+  }
+
+  /* Desktop-specific layouts */
+  .sidebar-desktop {
+    @apply w-64 flex-shrink-0;
+  }
+
+  .content-with-sidebar {
+    @apply ml-64;
+  }
+}
+
+/* Extra large devices (large desktops, 1280px and up) */
+@media (min-width: 1280px) {
+  html {
+    font-size: 16px;
+  }
+
+  /* Expanded grid for wide screens */
+  .grid-xl-4col {
+    @apply grid-cols-4;
+  }
+}
+
+/* 2K displays */
+@media (min-width: 1920px) {
+  html {
+    font-size: 18px;
+  }
+  
+  .container-responsive {
+    max-width: 1600px;
+  }
+
+  /* Larger spacing on big screens */
+  .spacing-2k {
+    @apply gap-8 p-8;
+  }
+}
+
+/* 4K displays */
+@media (min-width: 2560px) {
+  html {
+    font-size: 20px;
+  }
+  
+  .container-responsive {
+    max-width: 2000px;
+  }
+
+  /* Even larger spacing on 4K */
+  .spacing-4k {
+    @apply gap-10 p-10;
+  }
+}
+
+/* Ultra-wide monitors */
+@media (min-width: 3440px) {
+  html {
+    font-size: 22px;
+  }
+
+  .container-responsive {
+    max-width: 2400px;
+  }
+}
+
+/* Portrait orientation optimizations */
+@media (orientation: portrait) {
+  .portrait-full-height {
+    min-height: 100svh;
+  }
+
+  .portrait-stack {
+    @apply flex-col;
+  }
+}
+
+/* Landscape orientation optimizations */
+@media (orientation: landscape) and (max-height: 500px) {
+  /* Compact headers for landscape phones */
+  .landscape-compact-header {
+    @apply py-2;
+  }
+
+  /* Reduce vertical padding in landscape */
+  .landscape-compact {
+    @apply py-1;
+  }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Crisp borders on retina */
+  .border-crisp {
+    border-width: 0.5px;
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Dark mode preparation (respects system preference) */
+@media (prefers-color-scheme: dark) {
+  .auto-dark {
+    @apply bg-gray-900 text-white;
+  }
+}
+
+/* Hover capability detection */
+@media (hover: hover) {
+  .hover-capable:hover {
+    @apply scale-105;
+  }
+}
+
+@media (hover: none) {
+  /* Touch devices - disable hover effects that cause issues */
+  .hover-capable:hover {
+    transform: none;
+  }
+}
+
+/* Coarse pointer (touch screens) */
+@media (pointer: coarse) {
+  /* Larger touch targets */
+  .touch-target-auto {
+    @apply min-h-[48px] min-w-[48px];
+  }
+}
+
+/* Fine pointer (mouse) */
+@media (pointer: fine) {
+  /* Normal sized targets for mouse users */
+  .touch-target-auto {
+    @apply min-h-[32px] min-w-[32px];
+  }
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+  body {
+    @apply bg-white text-black;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   SAFE AREA SUPPORT FOR MOBILE DEVICES
+   ============================================ */
+@layer utilities {
+  /* Safe area padding for notched devices */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  
+  .safe-area-right {
+    padding-right: env(safe-area-inset-right);
+  }
+  
+  /* Height utilities for safe areas */
+  .h-safe-area-inset-bottom {
+    height: env(safe-area-inset-bottom);
+  }
+  
+  .h-safe-area-inset-top {
+    height: env(safe-area-inset-top);
+  }
+}
+
+/* ============================================
+   ADDITIONAL RESPONSIVE FIXES
+   ============================================ */
+
+/* Prevent horizontal overflow globally */
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Fix for tables causing horizontal scroll */
+table {
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 768px) {
+  table {
+    display: table;
+    white-space: normal;
+  }
+}
+
+/* Long text truncation */
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Multi-line text truncation */
+.text-truncate-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.text-truncate-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Responsive flex wrap */
+.flex-responsive {
+  @apply flex flex-col sm:flex-row;
+}
+
+.flex-responsive-reverse {
+  @apply flex flex-col-reverse sm:flex-row;
+}
+
+/* Responsive width utilities */
+.w-responsive-full {
+  @apply w-full sm:w-auto;
+}
+
+.w-responsive-half {
+  @apply w-full sm:w-1/2;
+}
+
+/* Fix for modals on mobile */
+.modal-mobile-fix {
+  max-height: 100dvh;
+  max-height: -webkit-fill-available;
+}
+
+/* Better mobile input styling */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+textarea,
+select {
+  font-size: 16px !important; /* Prevents iOS zoom on focus */
+}
+
+/* Fix for iOS safari bottom bar overlap */
+.pb-mobile-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+}
+
+/* Fix for flex items overflowing */
+.flex-item-fix {
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Responsive button groups */
+.btn-group-responsive {
+  @apply flex flex-col sm:flex-row gap-2 sm:gap-3;
+}
+
+.btn-group-responsive > button,
+.btn-group-responsive > a {
+  @apply w-full sm:w-auto;
+}
+
+/* Responsive image aspect ratios */
+.aspect-video-mobile {
+  @apply aspect-square sm:aspect-video;
+}
+
+.aspect-card {
+  @apply aspect-[4/3] sm:aspect-[16/10];
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Thin scrollbar for desktop */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.7);
+}
+
+/* Mobile-first card layouts */
+.card-mobile {
+  @apply rounded-lg sm:rounded-xl shadow-sm sm:shadow-md;
+}
+
+/* Responsive padding for cards */
+.card-content {
+  @apply p-3 sm:p-4 md:p-5 lg:p-6;
+}
+
+/* Fix for absolute positioned elements causing overflow */
+.overflow-clip {
+  overflow: clip;
+}
+
+/* Responsive grid auto-fill */
+.grid-auto-fill {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .grid-auto-fill {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+  }
+}
+
+/* Responsive stack layout */
+.stack-mobile {
+  @apply flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4;
+}
+
+/* Full viewport height (accounts for mobile browser chrome) */
+.min-h-screen-real {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.h-screen-real {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Responsive icon sizing */
+.icon-responsive {
+  @apply w-4 h-4 sm:w-5 sm:h-5;
+}
+
+.icon-responsive-lg {
+  @apply w-5 h-5 sm:w-6 sm:h-6;
+}
+
+/* Mobile navigation fixes */
+.nav-mobile-spacing {
+  @apply px-3 py-2 sm:px-4 sm:py-2.5;
+}
+
+/* Responsive badge */
+.badge-responsive {
+  @apply text-xs sm:text-sm px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full;
+}
+
+/* Loading skeleton responsive */
+.skeleton-responsive {
+  @apply h-4 sm:h-5 bg-gray-200 rounded animate-pulse;
+}
+
+/* Responsive spacing between sections */
+.section-gap {
+  @apply mb-6 sm:mb-8 md:mb-10 lg:mb-12;
+}
+
+/* Fix long words breaking layout */
+.word-break-all {
+  word-break: break-all;
+}
+
+.word-break-word {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Responsive header heights */
+.header-height {
+  @apply h-14 sm:h-16 md:h-20;
+}
+
+/* Bottom navigation spacing on mobile */
+.bottom-nav-spacing {
+  @apply pb-16 sm:pb-0;
+}
+
+/* Touch-friendly spacing */
+.touch-spacing {
+  @apply p-3 sm:p-2;
+}
+
+/* Responsive avatar sizes */
+.avatar-xs {
+  @apply w-6 h-6 sm:w-7 sm:h-7;
+}
+
+.avatar-sm {
+  @apply w-8 h-8 sm:w-10 sm:h-10;
+}
+
+.avatar-md {
+  @apply w-10 h-10 sm:w-12 sm:h-12;
+}
+
+.avatar-lg {
+  @apply w-12 h-12 sm:w-16 sm:h-16;
+}
+
+/* Fix for flex containers */
+.flex-no-shrink {
+  flex-shrink: 0;
+}
+
+.flex-grow-0 {
+  flex-grow: 0;
+}
+
+/* Responsive max-width for content */
+.content-max-width {
+  @apply max-w-full sm:max-w-xl md:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto;
+}
+
+/* Mobile-friendly tap areas */
+.tap-area {
+  position: relative;
+}
+
+.tap-area::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  bottom: -8px;
+  left: -8px;
+}
+
+/* Responsive visibility */
+.mobile-only {
+  @apply block sm:hidden;
+}
+
+.desktop-only {
+  @apply hidden sm:block;
+}
+
+.tablet-up {
+  @apply hidden md:block;
+}
+
+.mobile-hide {
+  @apply hidden xs:block;
+}
+
+/* Fix for iOS momentum scrolling */
+.scroll-smooth-ios {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Prevent text selection on interactive elements */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Ensure proper stacking context */
+.isolate {
+  isolation: isolate;
+}
+
+/* Performance optimizations */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+/* GPU acceleration for smooth animations */
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+

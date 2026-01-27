@@ -1,0 +1,8 @@
+# Cloudflare Pages / Netlify Redirects
+# SPA fallback - redirect all routes to index.html
+
+# API proxy (update with your actual backend URL)
+/api/*  https://your-backend-url.com/api/:splat  200
+
+# SPA fallback for client-side routing
+/*  /index.html  200
