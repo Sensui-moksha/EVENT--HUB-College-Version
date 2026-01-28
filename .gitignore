@@ -5,14 +5,17 @@ node_modules/
 
 # Testing
 coverage/
+.nyc_output/
 
 # Production
 dist/
 build/
+out/
 
 # Misc
 .DS_Store
 *.pem
+.env
 .env.local
 .env.*.local
 .env.development.local
@@ -26,6 +29,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
 
 # IDE
 .vscode/
@@ -33,10 +37,16 @@ pnpm-debug.log*
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
+.history/
+.vscode-test
 
 # OS
 Thumbs.db
 .DS_Store
+.AppleDouble
+.LSOverride
 
 # Uploads (if applicable)
 uploads/
@@ -45,11 +55,12 @@ server/uploads/*
 !server/uploads/.gitkeep
 
 # Server .env files
+server/.env
 server/.env.local
 server/.env.*.local
+server/uploads/
 
 # Docker
-*.log
 docker-compose.override.yml
 .docker/
 
@@ -59,6 +70,7 @@ docker-compose.override.yml
 # Cloudflare
 .wrangler/
 .dev.vars
+wrangler.toml.local
 
 # Temporary files
 *.tmp
@@ -75,6 +87,7 @@ docker-compose.override.yml
 # Debug
 .npm
 .eslintcache
+.parcel-cache
 
 # Optional npm cache directory
 .npm
@@ -91,4 +104,23 @@ docker-compose.override.yml
 *.key
 
 # MongoDB data (local development)
-data/db/
+data/
+db/
+
+# System files
+.env.*.json
+.cache/
+
+# Build artifacts
+*.min.js
+*.min.css
+
+# Vite specific
+.vite/
+
+# Node/Yarn/npm
+.pnp.js
+.pnp
+
+# Optional eslint cache
+.eslintcache
