@@ -13,7 +13,6 @@ build/
 # Misc
 .DS_Store
 *.pem
-.env
 .env.local
 .env.*.local
 .env.development.local
@@ -46,7 +45,6 @@ server/uploads/*
 !server/uploads/.gitkeep
 
 # Server .env files
-server/.env
 server/.env.local
 server/.env.*.local
 
