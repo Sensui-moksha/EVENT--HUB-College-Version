@@ -6,21 +6,18 @@ node_modules/
 # Testing
 coverage/
 .nyc_output/
+*.lcov
 
 # Production
 dist/
 build/
 out/
+*.min.js
+*.min.css
 
 # Misc
 .DS_Store
 *.pem
-.env
-.env.local
-.env.*.local
-.env.development.local
-.env.test.local
-.env.production.local
 
 # Logs
 logs/
@@ -41,12 +38,21 @@ lerna-debug.log*
 *.sublime-workspace
 .history/
 .vscode-test
+.vscode-test/
+.devcontainer
+.metals
+.bloop
 
 # OS
 Thumbs.db
 .DS_Store
 .AppleDouble
 .LSOverride
+*.swp
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+desktop.ini
 
 # Uploads (if applicable)
 uploads/
@@ -55,9 +61,6 @@ server/uploads/*
 !server/uploads/.gitkeep
 
 # Server .env files
-server/.env
-server/.env.local
-server/.env.*.local
 server/uploads/
 
 # Docker
@@ -72,11 +75,17 @@ docker-compose.override.yml
 .dev.vars
 wrangler.toml.local
 
+# Vite
+.vite/
+.vite
+
 # Temporary files
 *.tmp
 *.temp
 .cache
 .turbo
+.next
+out/
 
 # Package manager locks (keep one, ignore others if not using)
 # Uncomment the ones you don't use:
@@ -88,6 +97,7 @@ wrangler.toml.local
 .npm
 .eslintcache
 .parcel-cache
+.cache/
 
 # Optional npm cache directory
 .npm
@@ -98,7 +108,11 @@ wrangler.toml.local
 # Sentry
 .sentryclirc
 
-# Local SSL certificates
+# System/IDE cache
+.cache/
+*.bak
+*~
+.DS_Store/.DS_Store# Local SSL certificates
 *.pem
 *.crt
 *.key
