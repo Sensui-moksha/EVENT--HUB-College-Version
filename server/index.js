@@ -94,13 +94,37 @@ const getCorsOriginValidator = () => {
   
   if (isProduction && allowedOrigins && allowedOrigins.length > 0) {
     logger.production('🌐 CORS: Restricted to allowed origins:', allowedOrigins);
+    
+    // Compile wildcard patterns to regex for efficient matching
+    const wildcardPatterns = allowedOrigins
+      .filter(origin => origin.includes('*'))
+      .map(origin => {
+        // Convert wildcard pattern (e.g., *.mictech.dpdns.org) to regex
+        // Escape special regex chars except *, then replace * with .*
+        const escaped = origin.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+        return new RegExp(`^${escaped}$`);
+      });
+    
+    // Exact match origins (non-wildcard)
+    const exactOrigins = allowedOrigins.filter(origin => !origin.includes('*'));
+    
     return (origin, callback) => {
       // Allow requests with no origin (like mobile apps or curl)
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
+      if (!origin) {
+        return callback(null, true);
       }
+      
+      // Check exact matches
+      if (exactOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      
+      // Check wildcard patterns
+      if (wildcardPatterns.some(pattern => pattern.test(origin))) {
+        return callback(null, true);
+      }
+      
+      callback(new Error('Not allowed by CORS'));
     };
   }
   
