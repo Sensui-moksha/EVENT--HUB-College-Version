@@ -60,7 +60,21 @@ public/uploads/
 server/uploads/*
 !server/uploads/.gitkeep
 
-# Server .env files
+# Environment variables - DO NOT COMMIT
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.test
+server/.env
+server/.env.local
+server/.env.*.local
+server/.env.production
+server/.env.development
+server/.env.test
+
+# Server uploads
 server/uploads/
 
 # Docker
