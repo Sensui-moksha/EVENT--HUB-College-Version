@@ -94,8 +94,20 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Dynamic CORS configuration for production deployment
 const getCorsOriginValidator = () => {
   // In production, restrict origins if ALLOWED_ORIGINS is set
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean);
+  let allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean);
   
+  // If running in production and no explicit ALLOWED_ORIGINS were provided,
+  // try to automatically use FRONTEND_URL or WEBSITE_URL as the allowed origin.
+  if (isProduction && (!allowedOrigins || allowedOrigins.length === 0)) {
+    const autoOrigin = process.env.FRONTEND_URL || process.env.WEBSITE_URL;
+    if (autoOrigin) {
+      allowedOrigins = [autoOrigin];
+      logger.production('🌐 CORS: No ALLOWED_ORIGINS provided — using FRONTEND_URL/WEBSITE_URL as allowed origin:', allowedOrigins);
+    } else {
+      logger.production('🌐 CORS: No ALLOWED_ORIGINS or FRONTEND_URL/WEBSITE_URL provided — allowing ALL origins (WARNING: not recommended in production)');
+    }
+  }
+
   if (isProduction && allowedOrigins && allowedOrigins.length > 0) {
     logger.production('🌐 CORS: Restricted to allowed origins:', allowedOrigins);
     
@@ -196,8 +208,11 @@ app.use(cors(corsOptions));
 // Explicit OPTIONS handler for preflight requests
 app.options('*', cors(corsOptions));
 
-// Trust proxy (important for production behind reverse proxy like Nginx)
+// Trust proxy (important for production behind reverse proxy like Nginx, Cloudflare, Coolify)
+// Auto-configure: always trust proxy in production (Coolify, Cloudflare tunnels, etc.)
+// In development, trust proxy by default too for local tunnel testing
 app.set('trust proxy', 1);
+logger.production('[Proxy] trust proxy set to: 1 (auto-configured for reverse proxy support)');
 
 // Request metrics middleware for health monitoring
 app.use((req, res, next) => {
@@ -276,6 +291,7 @@ app.use('/api', (req, res, next) => {
 });
 
 // Session middleware for authentication with MongoDB store for persistence
+// Cookie settings are auto-configured to work with both HTTP (Coolify tunnel) and HTTPS
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
   resave: false,
@@ -286,41 +302,21 @@ app.use(session({
     ttl: 24 * 60 * 60, // 24 hours
     autoRemove: 'native'
   }),
-  cookie: (function() {
-    // Allow overriding via env for tricky CDNs or subdomain setups
-    const cookieDomain = process.env.SESSION_COOKIE_DOMAIN || undefined; // e.g. .mictech.dpdns.org
-    const sameSiteEnv = process.env.SESSION_SAME_SITE; // 'lax'|'strict'|'none'
-    const isProd = process.env.NODE_ENV === 'production';
-
-    const cookieOpts = {
-      // Allow explicit override for environments where NODE_ENV=production
-      // but the app is served over HTTP (e.g. preview instances).
-      // If SESSION_COOKIE_SECURE is set to 'true' or 'false' it will be used;
-      // otherwise we default to the conventional isProd value.
-      secure: (typeof process.env.SESSION_COOKIE_SECURE !== 'undefined')
-        ? (process.env.SESSION_COOKIE_SECURE === 'true')
-        : isProd,
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    };
-
-    // Prefer explicit env, otherwise default to 'none' in production to work behind proxies/CDNs,
-    // and 'lax' in development for easier local testing.
-    cookieOpts.sameSite = sameSiteEnv || (isProd ? 'none' : 'lax');
-
-    if (cookieDomain) cookieOpts.domain = cookieDomain;
-
-    // Log effective cookie options at startup (sparse output)
-    logger.production('[Session] cookie options:', {
-      domain: cookieOpts.domain || null,
-      secure: cookieOpts.secure,
-      sameSite: cookieOpts.sameSite,
-      httpOnly: cookieOpts.httpOnly
-    });
-
-    return cookieOpts;
-  })()
+  cookie: {
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    // Use 'lax' sameSite which works for both HTTP and HTTPS without requiring secure cookies
+    // This is the best option for Coolify/Cloudflare tunnel setups
+    sameSite: 'lax',
+    // Don't force secure cookies - this allows HTTP access behind reverse proxy
+    // The proxy (Cloudflare/Coolify) handles HTTPS termination
+    secure: false,
+    domain: process.env.SESSION_COOKIE_DOMAIN || undefined
+  }
 }));
+
+// Log session config at startup
+logger.production('[Session] cookie options: { secure: false (proxy-friendly), sameSite: "lax", httpOnly: true }');
 
 // Session debugging middleware - log when session is created/accessed
 app.use((req, res, next) => {
@@ -389,29 +385,6 @@ app.get('/api/health/status', (req, res) => {
       hasUser: !!req.session?.user,
       userEmail: req.session?.user?.email || null
     }
-  });
-});
-
-// Temporary debug endpoint to inspect session headers/state.
-// Enabled when DEBUG_SESSION=true OR when request provides a matching DEBUG_SESSION_TOKEN.
-app.get('/api/debug/session', (req, res) => {
-  const debugEnabled = process.env.DEBUG_SESSION === 'true';
-  const token = req.headers['x-debug-token'] || req.query.token;
-  const allowedToken = process.env.DEBUG_SESSION_TOKEN;
-
-  if (!debugEnabled && (!allowedToken || token !== allowedToken)) {
-    return res.status(403).json({ error: 'Debug endpoint disabled' });
-  }
-
-  // Return limited session info and request cookies/headers for debugging only
-  res.json({
-    sessionID: req.sessionID,
-    hasSession: !!req.session,
-    hasUser: !!req.session?.user,
-    user: req.session?.user ? { id: req.session.user._id || req.session.user.id, email: req.session.user.email, role: req.session.user.role } : null,
-    requestCookieHeader: req.headers.cookie || null,
-    origin: req.headers.origin || null,
-    timestamp: new Date().toISOString()
   });
 });
 
