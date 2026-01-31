@@ -94,8 +94,20 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Dynamic CORS configuration for production deployment
 const getCorsOriginValidator = () => {
   // In production, restrict origins if ALLOWED_ORIGINS is set
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean);
+  let allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean);
   
+  // If running in production and no explicit ALLOWED_ORIGINS were provided,
+  // try to automatically use FRONTEND_URL or WEBSITE_URL as the allowed origin.
+  if (isProduction && (!allowedOrigins || allowedOrigins.length === 0)) {
+    const autoOrigin = process.env.FRONTEND_URL || process.env.WEBSITE_URL;
+    if (autoOrigin) {
+      allowedOrigins = [autoOrigin];
+      logger.production('🌐 CORS: No ALLOWED_ORIGINS provided — using FRONTEND_URL/WEBSITE_URL as allowed origin:', allowedOrigins);
+    } else {
+      logger.production('🌐 CORS: No ALLOWED_ORIGINS or FRONTEND_URL/WEBSITE_URL provided — allowing ALL origins (WARNING: not recommended in production)');
+    }
+  }
+
   if (isProduction && allowedOrigins && allowedOrigins.length > 0) {
     logger.production('🌐 CORS: Restricted to allowed origins:', allowedOrigins);
     
@@ -197,7 +209,18 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
 // Trust proxy (important for production behind reverse proxy like Nginx)
-app.set('trust proxy', 1);
+// Allow overriding via TRUST_PROXY env. If not provided, default to 1.
+// Example values: 'true' | 'false' | '1' | '2' | 'loopback'
+const trustProxyEnv = process.env.TRUST_PROXY;
+let trustProxyVal = 1;
+if (typeof trustProxyEnv !== 'undefined') {
+  if (trustProxyEnv === 'true') trustProxyVal = true;
+  else if (trustProxyEnv === 'false') trustProxyVal = false;
+  else if (!isNaN(parseInt(trustProxyEnv))) trustProxyVal = parseInt(trustProxyEnv);
+  else trustProxyVal = trustProxyEnv;
+}
+app.set('trust proxy', trustProxyVal);
+logger.production('[Proxy] trust proxy set to:', trustProxyVal);
 
 // Request metrics middleware for health monitoring
 app.use((req, res, next) => {
