@@ -2,6 +2,7 @@
  * Authentication Middleware - Session Based
  * Validates user sessions and protects routes that require authentication
  */
+import logger from '../utils/logger.js';
 
 /**
  * Optional auth middleware - sets req.user if logged in, but doesn't require auth
@@ -9,8 +10,6 @@
  */
 export const optionalAuth = (req, res, next) => {
   if (req.session && req.session.user) {
-import logger from '../utils/logger.js';
-
     req.user = {
       id: req.session.user._id || req.session.user.id,
       userId: req.session.user._id || req.session.user.id,
