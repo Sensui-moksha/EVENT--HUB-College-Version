@@ -3758,13 +3758,12 @@ app.post('/api/login', async (req, res) => {
     
     // Save user to session
     req.session.user = userObj;
-    // Ensure cookie domain matches request hostname (helps behind proxies/CDNs)
-    try {
-      req.session.cookie.domain = req.hostname;
-    } catch (e) {
-      // ignore if cookie object is not writable
-    }
-    
+
+    // Do NOT force cookie.domain here — letting the session middleware
+    // set the cookie based on the request avoids mismatches behind
+    // CDNs/reverse proxies. Log the cookie flags for debugging instead.
+    logger.production('[Login] session.cookie flags before save:', req.session.cookie);
+
     // Explicitly save the session to the store before responding
     req.session.save((err) => {
       if (err) {
