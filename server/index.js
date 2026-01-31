@@ -88,6 +88,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app);
 
+// Configure server timeouts for large file uploads
+// These settings prevent ERR_HTTP2_PROTOCOL_ERROR on slow/large uploads
+server.timeout = 10 * 60 * 1000; // 10 minutes for very large uploads
+server.keepAliveTimeout = 65 * 1000; // 65 seconds (slightly longer than typical LB timeout)
+server.headersTimeout = 66 * 1000; // Slightly longer than keepAliveTimeout
+server.requestTimeout = 10 * 60 * 1000; // 10 minutes for request processing
+
 // Check if running in production
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -208,11 +215,8 @@ app.use(cors(corsOptions));
 // Explicit OPTIONS handler for preflight requests
 app.options('*', cors(corsOptions));
 
-// Trust proxy (important for production behind reverse proxy like Nginx, Cloudflare, Coolify)
-// Auto-configure: always trust proxy in production (Coolify, Cloudflare tunnels, etc.)
-// In development, trust proxy by default too for local tunnel testing
+// Trust proxy (important for production behind reverse proxy like Nginx)
 app.set('trust proxy', 1);
-logger.production('[Proxy] trust proxy set to: 1 (auto-configured for reverse proxy support)');
 
 // Request metrics middleware for health monitoring
 app.use((req, res, next) => {
@@ -232,8 +236,8 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 // Middleware: remove problematic integrity attributes for Cloudflare Insights
 // Some CDNs or proxies may alter the script but leave an outdated SRI hash,
@@ -337,7 +341,13 @@ app.use('/api/gallery', galleryRoutes);
 // Manual GridFS configuration using memoryStorage + GridFSBucket writes
 const mongoUri = process.env.MONGODB_URI;
 let gridFsBucket; // initialized after mongoose connection
-const uploadMiddleware = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 * 1024 } }); // 1GB soft cap
+const uploadMiddleware = multer({ 
+  storage: multer.memoryStorage(), 
+  limits: { 
+    fileSize: 1024 * 1024 * 1024, // 1GB soft cap
+    fieldSize: 100 * 1024 * 1024  // 100MB field size limit
+  } 
+});
 
 // Health check endpoint with cache stats
 app.get('/api/health', async (req, res) => {
@@ -5566,80 +5576,21 @@ app.delete('/api/images/:id', async (req, res) => {
 });
 
 // --- USER AVATAR UPLOAD (GridFS) ---
-// Uploads avatar, stores in GridFS and updates user's avatar URL and avatarGridFsId
-app.post('/api/user/:id/avatar', uploadMiddleware.single('avatar'), async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-
-    let oldGridId = user.avatarGridFsId || null;
-
-    if (req.file && gridFsBucket) {
-      const filename = `${Date.now()}-${req.file.originalname}`;
-      const writeStream = gridFsBucket.openUploadStream(filename, {
-        contentType: req.file.mimetype,
-        metadata: {
-          uploadedBy: `user-${user._id}`,
-          originalName: req.file.originalname,
-          mimeType: req.file.mimetype,
-          uploadDate: new Date().toISOString()
-        }
-      });
-      writeStream.end(req.file.buffer);
-      const savedFile = await new Promise((resolve, reject) => {
-        writeStream.on('error', reject);
-        writeStream.on('finish', resolve);
-      });
-      if (savedFile && savedFile._id) {
-        user.avatar = `/api/images/${savedFile._id}`;
-        user.avatarGridFsId = savedFile._id;
-        try {
-          const img = await loadImage(req.file.buffer);
-          // optionally store dimensions if needed
-        } catch (err) {
-          console.warn('Avatar dimension read failed:', err.message);
-        }
-        await user.save();
-      }
-    } else {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    // Delete old GridFS file if replaced
-    if (oldGridId && user.avatarGridFsId && oldGridId.toString() !== user.avatarGridFsId.toString()) {
-      try { gridFsBucket.delete(oldGridId); } catch (err) { console.warn('Failed to delete old avatar GridFS file:', err.message); }
-    }
-
-    const userObj = user.toObject();
-    delete userObj.password;
-    res.json({ success: true, user: userObj });
-  } catch (err) {
-    console.error('Avatar upload error:', err);
-    res.status(400).json({ error: err.message });
-  }
+// DISABLED: Profile picture uploads are not allowed
+app.post('/api/user/:id/avatar', (req, res) => {
+  return res.status(403).json({ 
+    error: 'Profile picture uploads are disabled', 
+    message: 'This feature has been disabled by the administrator.' 
+  });
 });
 
 // --- USER AVATAR DELETE ---
-app.delete('/api/user/:id/avatar', async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-
-    const oldGridId = user.avatarGridFsId || null;
-
-    user.avatar = '';
-    user.avatarGridFsId = undefined;
-    await user.save();
-
-    if (oldGridId) {
-      try { gridFsBucket.delete(oldGridId); } catch (err) { console.warn('Failed to delete avatar GridFS file:', err.message); }
-    }
-
-    return res.json({ success: true });
-  } catch (err) {
-    console.error('Avatar delete error:', err.message);
-    return res.status(400).json({ error: err.message });
-  }
+// DISABLED: Profile picture management is not allowed
+app.delete('/api/user/:id/avatar', (req, res) => {
+  return res.status(403).json({ 
+    error: 'Profile picture management is disabled', 
+    message: 'This feature has been disabled by the administrator.' 
+  });
 });
 
 // UPDATE EVENT (PUT) - Update event with JSON body
