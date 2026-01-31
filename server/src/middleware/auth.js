@@ -33,13 +33,22 @@ export const authenticateToken = (req, res, next) => {
     console.log('[Auth Debug] Session ID:', req.sessionID);
     console.log('[Auth Debug] Session exists:', !!req.session);
     console.log('[Auth Debug] Session user:', req.session?.user ? 'Present' : 'Missing');
+    if (!req.session?.user) {
+      console.log('[Auth Debug] Full session object:', JSON.stringify(req.session, null, 2));
+    }
   }
   
   // Check if user is in session (set during login)
   if (!req.session || !req.session.user) {
+    console.warn('[Auth] Unauthorized access attempt - no session user');
     return res.status(401).json({
       error: 'Access denied. Please log in.',
-      code: 'NOT_AUTHENTICATED'
+      code: 'NOT_AUTHENTICATED',
+      debug: {
+        hasSession: !!req.session,
+        hasSessionID: !!req.sessionID,
+        sessionData: process.env.NODE_ENV !== 'production' ? req.session : undefined
+      }
     });
   }
 

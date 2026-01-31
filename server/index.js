@@ -3743,8 +3743,16 @@ app.post('/api/login', async (req, res) => {
     // Save user to session
     req.session.user = userObj;
     
-    // Session-based authentication (no JWT tokens)
-    res.json({ message: 'Login successful', user: userObj });
+    // Explicitly save the session to the store before responding
+    req.session.save((err) => {
+      if (err) {
+        console.error('[Login] Session save error:', err);
+        return res.status(500).json({ error: 'Failed to create session' });
+      }
+      
+      // Session-based authentication (no JWT tokens)
+      res.json({ message: 'Login successful', user: userObj });
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -20,15 +20,9 @@
   "icons": [
     {
       "src": "/logo-small.png",
-      "sizes": "192x192",
+      "sizes": "165x106",
       "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "/logo-small.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
     },
     {
       "src": "/favicon.svg",
@@ -46,7 +40,7 @@
       "icons": [
         {
           "src": "/logo-small.png",
-          "sizes": "192x192",
+          "sizes": "165x106",
           "type": "image/png"
         }
       ]
@@ -59,7 +53,7 @@
       "icons": [
         {
           "src": "/logo-small.png",
-          "sizes": "192x192",
+          "sizes": "165x106",
           "type": "image/png"
         }
       ]
