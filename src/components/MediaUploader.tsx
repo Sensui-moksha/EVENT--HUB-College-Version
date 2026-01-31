@@ -9,6 +9,7 @@ interface MediaUploaderProps {
   timeRemaining?: number | null; // seconds
   uploadedBytes?: number; // bytes uploaded
   totalBytes?: number; // total bytes
+  uploadStatus?: string; // Status message for chunked uploads
   acceptedTypes?: string[];
   multiple?: boolean;
 }
@@ -22,6 +23,7 @@ interface MediaUploaderProps {
  * - File preview
  * - Type/size validation
  * - Upload button with progress
+ * - Chunked upload status display
  */
 export const MediaUploader: React.FC<MediaUploaderProps> = ({
   onFilesSelected,
@@ -31,6 +33,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   timeRemaining,
   uploadedBytes,
   totalBytes,
+  uploadStatus,
   acceptedTypes = ['image/*', 'video/*'],
   multiple = true
 }) => {
@@ -240,6 +243,12 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
                 <div className="text-xs text-gray-400 mt-1 text-center">
                   {formatFileSize(uploadedBytes)} / {formatFileSize(totalBytes)}
                 </div>
+              )}
+              {/* Status message for chunked uploads */}
+              {uploadStatus && (
+                <p className="text-xs text-blue-600 mt-2 text-center font-medium bg-blue-50 rounded-lg py-2">
+                  {uploadStatus}
+                </p>
               )}
               <p className="text-xs text-gray-500 mt-1 text-center">
                 Please wait while your files are being uploaded...

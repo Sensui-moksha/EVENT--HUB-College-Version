@@ -126,11 +126,21 @@ export const useGallery = (eventId: string) => {
  * Uses XMLHttpRequest for reliable progress tracking and background tab support
  * GridFS-only uploads for maximum performance
  * 
+ * CHUNKED UPLOAD for large videos:
+ * - Videos over 3MB use chunked upload to avoid Cloudflare 100s timeout
+ * - 2MB chunks ensure each request completes quickly
+ * - Automatic retry on chunk failure
+ * 
  * BACKGROUND TAB BEHAVIOR:
  * - Upload continues even when tab is in background (XHR is network-level)
  * - Progress updates may be throttled by browser (batched to ~1/sec)
  * - Progress syncs immediately when tab becomes visible again
  */
+
+// Chunked upload threshold and chunk size
+const CHUNKED_UPLOAD_THRESHOLD = 3 * 1024 * 1024; // 3MB - use chunked for larger videos
+const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB chunks - safe for Cloudflare timeout
+
 export const useGalleryUpload = (eventId: string) => {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -140,7 +150,9 @@ export const useGalleryUpload = (eventId: string) => {
   const [uploadedBytes, setUploadedBytes] = useState(0);
   const [totalBytes, setTotalBytes] = useState(0);
   const [currentXhr, setCurrentXhr] = useState<XMLHttpRequest | null>(null);
-  const [isTabActive, setIsTabActive] = useState(true);
+  const [_isTabActive, setIsTabActive] = useState(true);
+  const [uploadStatus, setUploadStatus] = useState<string>('');
+  const abortControllerRef = { current: null as AbortController | null };
 
   // Track tab visibility to sync progress when user returns
   useEffect(() => {
@@ -164,7 +176,114 @@ export const useGalleryUpload = (eventId: string) => {
       currentXhr.abort();
       setCurrentXhr(null);
     }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
   }, [currentXhr]);
+
+  /**
+   * Upload a single large file using chunked upload
+   * This avoids Cloudflare's 100-second timeout by uploading in small pieces
+   */
+  const uploadFileChunked = useCallback(
+    async (file: File, onProgress: (loaded: number, total: number) => void): Promise<GalleryMedia> => {
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+      
+      setUploadStatus(`Initializing chunked upload for ${file.name}...`);
+      
+      // 1. Initialize upload
+      const initResponse = await apiRequest(`/api/gallery/${eventId}/upload-chunk/init`, {
+        method: 'POST',
+        body: JSON.stringify({
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type,
+          totalChunks
+        })
+      });
+      
+      if (!initResponse.success) {
+        throw new Error(initResponse.error || 'Failed to initialize upload');
+      }
+      
+      const { uploadId } = initResponse;
+      let uploadedChunks = 0;
+      
+      abortControllerRef.current = new AbortController();
+      
+      try {
+        // 2. Upload each chunk
+        for (let i = 0; i < totalChunks; i++) {
+          if (abortControllerRef.current?.signal.aborted) {
+            throw new Error('Upload cancelled');
+          }
+          
+          const start = i * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, file.size);
+          const chunk = file.slice(start, end);
+          
+          setUploadStatus(`Uploading chunk ${i + 1}/${totalChunks}...`);
+          
+          // Upload chunk with retry
+          let retries = 3;
+          while (retries > 0) {
+            try {
+              const chunkResponse = await fetch(
+                getApiUrl(`/api/gallery/${eventId}/upload-chunk/${uploadId}/${i}`),
+                {
+                  method: 'POST',
+                  body: chunk,
+                  credentials: 'include',
+                  signal: abortControllerRef.current?.signal,
+                  headers: {
+                    'Content-Type': 'application/octet-stream'
+                  }
+                }
+              );
+              
+              if (!chunkResponse.ok) {
+                const errorData = await chunkResponse.json().catch(() => ({}));
+                throw new Error(errorData.error || `Chunk upload failed: ${chunkResponse.status}`);
+              }
+              
+              uploadedChunks++;
+              onProgress(uploadedChunks * CHUNK_SIZE, file.size);
+              break; // Success, exit retry loop
+            } catch (err) {
+              retries--;
+              if (retries === 0) throw err;
+              console.log(`[Chunked] Retrying chunk ${i}, ${retries} attempts left`);
+              await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
+            }
+          }
+        }
+        
+        // 3. Complete upload
+        setUploadStatus('Assembling file...');
+        const completeResponse = await apiRequest(
+          `/api/gallery/${eventId}/upload-chunk/${uploadId}/complete`,
+          { method: 'POST' }
+        );
+        
+        if (!completeResponse.success) {
+          throw new Error(completeResponse.error || 'Failed to complete upload');
+        }
+        
+        return completeResponse.media;
+      } catch (err) {
+        // Cancel the chunked upload on error
+        try {
+          await fetch(
+            getApiUrl(`/api/gallery/${eventId}/upload-chunk/${uploadId}`),
+            { method: 'DELETE', credentials: 'include' }
+          );
+        } catch { /* ignore cleanup error */ }
+        throw err;
+      }
+    },
+    [eventId]
+  );
 
   const uploadFiles = useCallback(
     async (files: File[]): Promise<GalleryMedia[]> => {
@@ -173,169 +292,203 @@ export const useGalleryUpload = (eventId: string) => {
       setUploadProgress(0);
       setUploadSpeed(null);
       setTimeRemaining(null);
+      setUploadStatus('');
       setUploadedBytes(0);
       
       const totalSize = files.reduce((sum, f) => sum + f.size, 0);
       setTotalBytes(totalSize);
 
-      return new Promise((resolve, reject) => {
-        const formData = new FormData();
-        files.forEach((file) => {
-          formData.append('files', file);
-        });
+      // Check if any video files need chunked upload (> 3MB)
+      const largeVideoFiles = files.filter(
+        f => f.type.startsWith('video/') && f.size > CHUNKED_UPLOAD_THRESHOLD
+      );
+      const regularFiles = files.filter(
+        f => !(f.type.startsWith('video/') && f.size > CHUNKED_UPLOAD_THRESHOLD)
+      );
 
-        // Use GridFS streaming endpoint - faster than Base64
-        const url = getApiUrl(`/api/gallery/${eventId}/upload-stream`);
+      const allMedia: GalleryMedia[] = [];
+      let totalUploaded = 0;
 
-        const xhr = new XMLHttpRequest();
-        setCurrentXhr(xhr);
-        
-        // 60 minute timeout for very large videos (increased from 30)
-        xhr.timeout = 60 * 60 * 1000;
-        
-        // Track upload metrics
-        const startTime = Date.now();
-        let lastTime = startTime;
-        let lastLoaded = 0;
-        
-        // Speed history for accurate averaging
-        const speedHistory: number[] = [];
-        const MAX_SPEED_SAMPLES = 10;
-        
-        // Keep track for progress interpolation
-        let actualProgress = 0;
-        let displayProgress = 0;
-        let progressInterval: ReturnType<typeof setInterval> | null = null;
-        let lastProgressUpdate = Date.now();
-        
-        // Smooth progress animation (runs every 50ms)
-        const startProgressAnimation = () => {
-          if (progressInterval) return;
-          progressInterval = setInterval(() => {
-            const now = Date.now();
-            
-            // If no real progress update in 10 seconds, show a slight animation to indicate activity
-            if (now - lastProgressUpdate > 10000 && displayProgress < 99) {
-              // Slow artificial progress to show upload is still working
-              displayProgress = Math.min(displayProgress + 0.05, actualProgress + 1);
-            } else if (displayProgress < actualProgress) {
-              // Smoothly catch up to actual progress
-              const diff = actualProgress - displayProgress;
-              const increment = Math.max(0.1, diff * 0.15);
-              displayProgress = Math.min(actualProgress, displayProgress + increment);
-            }
-            setUploadProgress(Math.round(displayProgress * 100) / 100);
-          }, 50);
-        };
-        
-        const stopProgressAnimation = () => {
-          if (progressInterval) {
-            clearInterval(progressInterval);
-            progressInterval = null;
-          }
-        };
-        
-        xhr.upload.addEventListener('progress', (event) => {
-          if (!event.lengthComputable) return;
+      try {
+        // 1. Upload large videos using chunked upload
+        for (const file of largeVideoFiles) {
+          console.log(`[Upload] Using chunked upload for ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
           
-          const now = Date.now();
-          const loaded = event.loaded;
-          const total = event.total;
+          const media = await uploadFileChunked(file, (loaded, _total) => {
+            const currentProgress = (totalUploaded + loaded) / totalSize * 100;
+            setUploadProgress(Math.min(currentProgress, 99));
+            setUploadedBytes(totalUploaded + loaded);
+          });
           
-          // Update actual progress
-          actualProgress = (loaded / total) * 100;
-          setUploadedBytes(loaded);
-          lastProgressUpdate = now;
-          
-          // Start animation if not started
-          startProgressAnimation();
-          
-          // Calculate speed (at least 300ms between calculations for stability)
-          const timeDiff = now - lastTime;
-          if (timeDiff >= 300) {
-            const bytesDiff = loaded - lastLoaded;
-            const instantSpeed = (bytesDiff / timeDiff) * 1000; // bytes per second
-            
-            // Add to history for averaging
-            speedHistory.push(instantSpeed);
-            if (speedHistory.length > MAX_SPEED_SAMPLES) {
-              speedHistory.shift();
-            }
-            
-            // Calculate average speed (more stable)
-            const avgSpeed = speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length;
-            setUploadSpeed(avgSpeed);
-            
-            // Calculate ETA
-            const remaining = total - loaded;
-            if (avgSpeed > 0) {
-              const eta = Math.ceil(remaining / avgSpeed);
-              setTimeRemaining(eta);
-            }
-            
-            lastTime = now;
-            lastLoaded = loaded;
-          }
-        });
+          allMedia.push(media);
+          totalUploaded += file.size;
+        }
 
-        xhr.addEventListener('load', () => {
-          stopProgressAnimation();
-          setUploading(false);
-          setCurrentXhr(null);
-          
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const data = JSON.parse(xhr.responseText);
-              setUploadProgress(100);
-              displayProgress = 100;
-              setTimeRemaining(0);
-              invalidateCache.onGalleryChange(eventId);
-              resolve(data.media || []);
-            } catch {
-              setUploadError('Invalid server response');
-              reject(new Error('Invalid server response'));
-            }
-          } else {
-            let errorMsg = 'Upload failed';
-            try {
-              const data = JSON.parse(xhr.responseText);
-              errorMsg = data.error || errorMsg;
-            } catch { /* ignore */ }
-            setUploadError(errorMsg);
-            reject(new Error(errorMsg));
-          }
-        });
+        // 2. Upload regular files (images and small videos) via streaming
+        if (regularFiles.length > 0) {
+          setUploadStatus('Uploading files...');
+          const streamMedia = await new Promise<GalleryMedia[]>((resolve, reject) => {
+            const formData = new FormData();
+            regularFiles.forEach((file) => {
+              formData.append('files', file);
+            });
 
-        xhr.addEventListener('error', () => {
-          stopProgressAnimation();
-          setUploading(false);
-          setCurrentXhr(null);
-          setUploadError('Network error. Check your connection and try again.');
-          reject(new Error('Network error'));
-        });
+            // Use GridFS streaming endpoint - faster than Base64
+            const url = getApiUrl(`/api/gallery/${eventId}/upload-stream`);
 
-        xhr.addEventListener('abort', () => {
-          stopProgressAnimation();
-          setUploading(false);
-          setCurrentXhr(null);
-          setUploadError('Upload cancelled');
-          reject(new Error('Upload cancelled'));
-        });
-        
-        xhr.addEventListener('timeout', () => {
-          stopProgressAnimation();
-          setUploading(false);
-          setCurrentXhr(null);
-          setUploadError('Upload timed out. Try a smaller file or check your connection.');
-          reject(new Error('Upload timeout'));
-        });
+            const xhr = new XMLHttpRequest();
+            setCurrentXhr(xhr);
+            
+            // 60 minute timeout for very large videos (increased from 30)
+            xhr.timeout = 60 * 60 * 1000;
+            
+            // Track upload metrics
+            const startTime = Date.now();
+            let lastTime = startTime;
+            let lastLoaded = 0;
+            
+            // Speed history for accurate averaging
+            const speedHistory: number[] = [];
+            const MAX_SPEED_SAMPLES = 10;
+            
+            // Keep track for progress interpolation
+            let actualProgress = 0;
+            let displayProgress = (totalUploaded / totalSize) * 100;
+            let progressInterval: ReturnType<typeof setInterval> | null = null;
+            let lastProgressUpdate = Date.now();
+            
+            // Smooth progress animation (runs every 50ms)
+            const startProgressAnimation = () => {
+              if (progressInterval) return;
+              progressInterval = setInterval(() => {
+                const now = Date.now();
+                
+                // If no real progress update in 10 seconds, show a slight animation to indicate activity
+                if (now - lastProgressUpdate > 10000 && displayProgress < 99) {
+                  // Slow artificial progress to show upload is still working
+                  displayProgress = Math.min(displayProgress + 0.05, actualProgress + 1);
+                } else if (displayProgress < actualProgress) {
+                  // Smoothly catch up to actual progress
+                  const diff = actualProgress - displayProgress;
+                  const increment = Math.max(0.1, diff * 0.15);
+                  displayProgress = Math.min(actualProgress, displayProgress + increment);
+                }
+                setUploadProgress(Math.round(displayProgress * 100) / 100);
+              }, 50);
+            };
+            
+            const stopProgressAnimation = () => {
+              if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+              }
+            };
+            
+            xhr.upload.addEventListener('progress', (event) => {
+              if (!event.lengthComputable) return;
+              
+              const now = Date.now();
+              const loaded = event.loaded;
+              
+              // Update actual progress (accounting for already uploaded chunked files)
+              actualProgress = ((totalUploaded + loaded) / totalSize) * 100;
+              setUploadedBytes(totalUploaded + loaded);
+              lastProgressUpdate = now;
+              
+              // Start animation if not started
+              startProgressAnimation();
+              
+              // Calculate speed (at least 300ms between calculations for stability)
+              const timeDiff = now - lastTime;
+              if (timeDiff >= 300) {
+                const bytesDiff = loaded - lastLoaded;
+                const instantSpeed = (bytesDiff / timeDiff) * 1000; // bytes per second
+                
+                // Add to history for averaging
+                speedHistory.push(instantSpeed);
+                if (speedHistory.length > MAX_SPEED_SAMPLES) {
+                  speedHistory.shift();
+                }
+                
+                // Calculate average speed (more stable)
+                const avgSpeed = speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length;
+                setUploadSpeed(avgSpeed);
+                
+                // Calculate ETA
+                const remaining = totalSize - totalUploaded - loaded;
+                if (avgSpeed > 0) {
+                  const eta = Math.ceil(remaining / avgSpeed);
+                  setTimeRemaining(eta);
+                }
+                
+                lastTime = now;
+                lastLoaded = loaded;
+              }
+            });
 
-        xhr.open('POST', url);
-        xhr.withCredentials = true;
-        xhr.send(formData);
-      });
+            xhr.addEventListener('load', () => {
+              stopProgressAnimation();
+              setCurrentXhr(null);
+              
+              if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                  const data = JSON.parse(xhr.responseText);
+                  resolve(data.media || []);
+                } catch {
+                  reject(new Error('Invalid server response'));
+                }
+              } else {
+                let errorMsg = 'Upload failed';
+                try {
+                  const data = JSON.parse(xhr.responseText);
+                  errorMsg = data.error || errorMsg;
+                } catch { /* ignore */ }
+                reject(new Error(errorMsg));
+              }
+            });
+
+            xhr.addEventListener('error', () => {
+              stopProgressAnimation();
+              setCurrentXhr(null);
+              reject(new Error('Network error. Connection may have been reset. Try uploading videos individually.'));
+            });
+
+            xhr.addEventListener('abort', () => {
+              stopProgressAnimation();
+              setCurrentXhr(null);
+              reject(new Error('Upload cancelled'));
+            });
+            
+            xhr.addEventListener('timeout', () => {
+              stopProgressAnimation();
+              setCurrentXhr(null);
+              reject(new Error('Upload timed out. Try a smaller file or check your connection.'));
+            });
+
+            xhr.open('POST', url);
+            xhr.withCredentials = true;
+            xhr.send(formData);
+          });
+
+          allMedia.push(...streamMedia);
+        }
+
+        // Success
+        setUploadProgress(100);
+        setTimeRemaining(0);
+        setUploadStatus('');
+        invalidateCache.onGalleryChange(eventId);
+        return allMedia;
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Upload failed';
+        setUploadError(errorMsg);
+        throw err;
+      } finally {
+        setUploading(false);
+        setCurrentXhr(null);
+      }
     },
-    [eventId, cancelUpload]
+    [eventId, cancelUpload, uploadFileChunked]
   );
 
   return { 
@@ -347,7 +500,8 @@ export const useGalleryUpload = (eventId: string) => {
     timeRemaining,
     uploadedBytes,
     totalBytes,
-    cancelUpload
+    cancelUpload,
+    uploadStatus
   };
 };
 

@@ -1287,3 +1287,269 @@ const uploadMediaStreamBase64 = async (req, res, eventId, userId) => {
   req.pipe(busboy);
 };
 
+// ==================== CHUNKED UPLOAD FOR LARGE FILES ====================
+// In-memory storage for chunked uploads (will be cleaned up after completion)
+const chunkedUploads = new Map();
+
+// Cleanup stale chunked uploads after 1 hour
+setInterval(() => {
+  const oneHourAgo = Date.now() - 60 * 60 * 1000;
+  for (const [uploadId, upload] of chunkedUploads.entries()) {
+    if (upload.lastActivity < oneHourAgo) {
+      logger.production(`Cleaning up stale chunked upload: ${uploadId}`);
+      chunkedUploads.delete(uploadId);
+    }
+  }
+}, 5 * 60 * 1000); // Check every 5 minutes
+
+/**
+ * Initialize chunked upload
+ * POST /api/gallery/:eventId/upload-chunk/init
+ * 
+ * For large video files that may timeout on Cloudflare (100s limit).
+ * Returns an uploadId to use for subsequent chunk uploads.
+ */
+export const initChunkedUpload = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { fileName, fileSize, mimeType, totalChunks } = req.body;
+    const userId = req.user?.id;
+
+    // Validate
+    if (!fileName || !fileSize || !mimeType || !totalChunks) {
+      return res.status(400).json({ error: 'Missing required fields: fileName, fileSize, mimeType, totalChunks' });
+    }
+
+    // Validate event exists
+    const Event = getEventModel();
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    // Check if GridFS is available
+    if (!isGridFSAvailable()) {
+      return res.status(503).json({ 
+        error: 'Storage system temporarily unavailable',
+        code: 'GRIDFS_UNAVAILABLE'
+      });
+    }
+
+    // Get or create gallery
+    let gallery = await Gallery.findOne({ eventId });
+    if (!gallery) {
+      gallery = new Gallery({
+        eventId,
+        folderPath: `gridfs://galleryMedia/${eventId}`,
+        published: false
+      });
+      await gallery.save();
+    }
+
+    // Generate unique upload ID
+    const uploadId = `${eventId}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}-${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+
+    // Store upload metadata
+    chunkedUploads.set(uploadId, {
+      eventId,
+      galleryId: gallery._id.toString(),
+      userId,
+      fileName: uniqueFileName,
+      originalName: fileName,
+      mimeType,
+      fileSize: parseInt(fileSize),
+      totalChunks: parseInt(totalChunks),
+      receivedChunks: new Map(),
+      lastActivity: Date.now(),
+      status: 'initialized'
+    });
+
+    logger.production(`[Chunked] Initialized upload ${uploadId} for ${fileName} (${(fileSize / 1024 / 1024).toFixed(2)}MB, ${totalChunks} chunks)`);
+
+    res.json({
+      success: true,
+      uploadId,
+      message: 'Chunked upload initialized'
+    });
+  } catch (error) {
+    logger.production('Error initializing chunked upload:', error.message);
+    res.status(500).json({ error: 'Failed to initialize upload' });
+  }
+};
+
+/**
+ * Upload a chunk
+ * POST /api/gallery/:eventId/upload-chunk/:uploadId/:chunkIndex
+ * 
+ * Uploads a single chunk of the file. Each chunk should be < 5MB to stay
+ * well under Cloudflare's timeout limits.
+ */
+export const uploadChunk = async (req, res) => {
+  try {
+    const { eventId, uploadId, chunkIndex } = req.params;
+    const index = parseInt(chunkIndex);
+
+    // Validate upload exists
+    const upload = chunkedUploads.get(uploadId);
+    if (!upload) {
+      return res.status(404).json({ error: 'Upload not found or expired' });
+    }
+
+    if (upload.eventId !== eventId) {
+      return res.status(403).json({ error: 'Upload ID does not match event' });
+    }
+
+    // Parse the chunk from the request body (binary data)
+    const chunks = [];
+    
+    await new Promise((resolve, reject) => {
+      req.on('data', chunk => chunks.push(chunk));
+      req.on('end', resolve);
+      req.on('error', reject);
+    });
+
+    const chunkData = Buffer.concat(chunks);
+    
+    // Store chunk
+    upload.receivedChunks.set(index, chunkData);
+    upload.lastActivity = Date.now();
+
+    logger.production(`[Chunked] Received chunk ${index + 1}/${upload.totalChunks} for ${uploadId} (${(chunkData.length / 1024).toFixed(1)}KB)`);
+
+    res.json({
+      success: true,
+      chunkIndex: index,
+      receivedChunks: upload.receivedChunks.size,
+      totalChunks: upload.totalChunks
+    });
+  } catch (error) {
+    logger.production('Error uploading chunk:', error.message);
+    res.status(500).json({ error: 'Failed to upload chunk' });
+  }
+};
+
+/**
+ * Complete chunked upload
+ * POST /api/gallery/:eventId/upload-chunk/:uploadId/complete
+ * 
+ * Assembles all chunks and saves to GridFS.
+ */
+export const completeChunkedUpload = async (req, res) => {
+  try {
+    const { eventId, uploadId } = req.params;
+    const userId = req.user?.id;
+
+    // Validate upload exists
+    const upload = chunkedUploads.get(uploadId);
+    if (!upload) {
+      return res.status(404).json({ error: 'Upload not found or expired' });
+    }
+
+    if (upload.eventId !== eventId) {
+      return res.status(403).json({ error: 'Upload ID does not match event' });
+    }
+
+    // Check all chunks received
+    if (upload.receivedChunks.size !== upload.totalChunks) {
+      return res.status(400).json({ 
+        error: `Missing chunks: received ${upload.receivedChunks.size}/${upload.totalChunks}`,
+        receivedChunks: upload.receivedChunks.size,
+        totalChunks: upload.totalChunks
+      });
+    }
+
+    // Assemble chunks in order
+    const orderedChunks = [];
+    for (let i = 0; i < upload.totalChunks; i++) {
+      const chunk = upload.receivedChunks.get(i);
+      if (!chunk) {
+        return res.status(400).json({ error: `Missing chunk ${i}` });
+      }
+      orderedChunks.push(chunk);
+    }
+    const completeFile = Buffer.concat(orderedChunks);
+
+    // Upload to GridFS
+    const mediaType = upload.mimeType.startsWith('video') ? 'video' : 'image';
+    const publicUrl = `/api/gallery/media/${upload.fileName}`;
+
+    const gridFSUploadStream = createUploadStream(upload.fileName, {
+      eventId,
+      galleryId: upload.galleryId,
+      originalName: upload.originalName,
+      mimeType: upload.mimeType,
+      mediaType,
+      uploadedBy: userId
+    });
+
+    await new Promise((resolve, reject) => {
+      gridFSUploadStream.on('finish', resolve);
+      gridFSUploadStream.on('error', reject);
+      gridFSUploadStream.end(completeFile);
+    });
+
+    // Create media document
+    const gallery = await Gallery.findById(upload.galleryId);
+    const media = new GalleryMedia({
+      eventId,
+      galleryId: upload.galleryId,
+      fileName: upload.fileName,
+      originalName: upload.originalName,
+      gridFSFileId: gridFSUploadStream.id,
+      storageType: 'gridfs',
+      fileData: null,
+      publicUrl,
+      type: mediaType,
+      mimeType: upload.mimeType,
+      fileSize: completeFile.length,
+      dimensions: null,
+      duration: null,
+      order: 0,
+      uploadedBy: userId
+    });
+
+    await media.save();
+
+    // Update gallery media count
+    if (gallery) {
+      gallery.mediaCount = await GalleryMedia.countDocuments({ galleryId: gallery._id });
+      await gallery.save();
+    }
+
+    // Cleanup
+    chunkedUploads.delete(uploadId);
+    invalidateCache.onGalleryChange(serverCache, eventId);
+
+    logger.production(`[Chunked] Completed upload ${uploadId}: ${upload.originalName} (${(completeFile.length / 1024 / 1024).toFixed(2)}MB)`);
+
+    res.json({
+      success: true,
+      message: 'File uploaded successfully via chunked upload',
+      media: media,
+      storageType: 'gridfs'
+    });
+  } catch (error) {
+    logger.production('Error completing chunked upload:', error.message);
+    res.status(500).json({ error: 'Failed to complete upload' });
+  }
+};
+
+/**
+ * Cancel chunked upload
+ * DELETE /api/gallery/:eventId/upload-chunk/:uploadId
+ */
+export const cancelChunkedUpload = async (req, res) => {
+  try {
+    const { uploadId } = req.params;
+    
+    if (chunkedUploads.has(uploadId)) {
+      chunkedUploads.delete(uploadId);
+      logger.production(`[Chunked] Cancelled upload ${uploadId}`);
+    }
+
+    res.json({ success: true, message: 'Upload cancelled' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to cancel upload' });
+  }
+};

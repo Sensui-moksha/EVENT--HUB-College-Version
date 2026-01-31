@@ -117,6 +117,53 @@ router.post(
   galleryController.uploadMediaStream
 );
 
+// ==================== CHUNKED UPLOAD ROUTES ====================
+// For large video files that may timeout on Cloudflare (100s limit)
+
+/**
+ * Initialize chunked upload
+ * POST /api/gallery/:eventId/upload-chunk/init
+ */
+router.post(
+  '/:eventId/upload-chunk/init',
+  authenticateToken,
+  authorizeRole('admin', 'organizer'),
+  galleryController.initChunkedUpload
+);
+
+/**
+ * Upload a chunk
+ * POST /api/gallery/:eventId/upload-chunk/:uploadId/:chunkIndex
+ */
+router.post(
+  '/:eventId/upload-chunk/:uploadId/:chunkIndex',
+  authenticateToken,
+  authorizeRole('admin', 'organizer'),
+  galleryController.uploadChunk
+);
+
+/**
+ * Complete chunked upload
+ * POST /api/gallery/:eventId/upload-chunk/:uploadId/complete
+ */
+router.post(
+  '/:eventId/upload-chunk/:uploadId/complete',
+  authenticateToken,
+  authorizeRole('admin', 'organizer'),
+  galleryController.completeChunkedUpload
+);
+
+/**
+ * Cancel chunked upload
+ * DELETE /api/gallery/:eventId/upload-chunk/:uploadId
+ */
+router.delete(
+  '/:eventId/upload-chunk/:uploadId',
+  authenticateToken,
+  authorizeRole('admin', 'organizer'),
+  galleryController.cancelChunkedUpload
+);
+
 /**
  * Delete media from gallery
  * DELETE /api/gallery/media/:mediaId
