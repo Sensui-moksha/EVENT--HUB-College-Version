@@ -3758,6 +3758,12 @@ app.post('/api/login', async (req, res) => {
     
     // Save user to session
     req.session.user = userObj;
+    // Ensure cookie domain matches request hostname (helps behind proxies/CDNs)
+    try {
+      req.session.cookie.domain = req.hostname;
+    } catch (e) {
+      // ignore if cookie object is not writable
+    }
     
     // Explicitly save the session to the store before responding
     req.session.save((err) => {
@@ -3767,6 +3773,8 @@ app.post('/api/login', async (req, res) => {
       }
       
       logger.production('[Login] Session saved successfully. SessionID:', req.sessionID, 'Email:', userObj.email);
+      // Expose session ID in header for debugging (safe to remove later)
+      res.setHeader('X-Session-ID', req.sessionID);
       // Session-based authentication (no JWT tokens)
       res.json({ message: 'Login successful', user: userObj });
     });
