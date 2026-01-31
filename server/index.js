@@ -133,7 +133,7 @@ const getCorsOriginValidator = () => {
   }
   
   // Development: Allow ALL origins
-  logger.log('🌐 CORS: Allowing ALL origins (development mode)');
+  logger.production('🌐 CORS: Allowing ALL origins (development mode)');
   return (origin, callback) => {
     callback(null, true);
   };
@@ -161,32 +161,32 @@ setAlertSocketIO(io);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-  logger.log('A user connected with socket id:', socket.id);
+  logger.production('A user connected with socket id:', socket.id);
 
   // Join a room based on userId
   socket.on('join', (userId) => {
     if (userId) {
       socket.join(`user_${userId}`);
-      logger.log(`Socket ${socket.id} joined room for user ${userId}`);
+      logger.production(`Socket ${socket.id} joined room for user ${userId}`);
     }
   });
 
   // Join system monitors room for health alerts (opt-in only, not all admins)
   socket.on('joinSystemMonitors', () => {
     socket.join('system_monitors');
-    logger.log(`Socket ${socket.id} joined system_monitors room for health alerts`);
+    logger.production(`Socket ${socket.id} joined system_monitors room for health alerts`);
   });
 
   // Legacy: Keep admin room for other admin features (not health alerts)
   socket.on('joinAdminRoom', (isAdmin) => {
     if (isAdmin) {
       socket.join('admins');
-      logger.log(`Socket ${socket.id} joined admin room`);
+      logger.production(`Socket ${socket.id} joined admin room`);
     }
   });
 
   socket.on('disconnect', () => {
-    logger.log('User disconnected with socket id:', socket.id);
+    logger.production('User disconnected with socket id:', socket.id);
   });
 });
 
@@ -275,7 +275,7 @@ app.use(session({
 // Session debugging middleware - log when session is created/accessed
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/gallery')) {
-    logger.log('[Session] Path:', req.path, '| SessionID:', req.sessionID, '| Has user:', !!req.session?.user);
+    logger.production('[Session] Path:', req.path, '| SessionID:', req.sessionID, '| Has user:', !!req.session?.user);
   }
   next();
 });
@@ -3766,7 +3766,7 @@ app.post('/api/login', async (req, res) => {
         return res.status(500).json({ error: 'Failed to create session' });
       }
       
-      logger.log('[Login] Session saved successfully. SessionID:', req.sessionID, 'Email:', userObj.email);
+      logger.production('[Login] Session saved successfully. SessionID:', req.sessionID, 'Email:', userObj.email);
       // Session-based authentication (no JWT tokens)
       res.json({ message: 'Login successful', user: userObj });
     });

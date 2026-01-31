@@ -421,7 +421,7 @@ export const uploadMedia = async (req, res) => {
         published: false
       });
       await gallery.save();
-      logger.log(`Auto-created gallery for event ${eventId} during upload`);
+      logger.production(`Auto-created gallery for event ${eventId} during upload`);
     }
 
     const uploadedMedia = [];
@@ -654,7 +654,7 @@ export const getGalleryManagement = async (req, res) => {
         published: false
       });
       await gallery.save();
-      logger.log(`Auto-created gallery for event ${eventId}`);
+      logger.production(`Auto-created gallery for event ${eventId}`);
     }
 
     const media = await GalleryMedia.find({ galleryId: gallery._id })
@@ -825,7 +825,7 @@ export const deleteGalleryForEvent = async (eventId) => {
     // Delete storage folders
     await storageManager.deleteEventGalleryFolders(eventId);
     
-    logger.log(`🗑️ Deleted ${galleries.length} galleries (main + sub-events) for event ${eventId}`);
+    logger.production(`🗑️ Deleted ${galleries.length} galleries (main + sub-events) for event ${eventId}`);
   } catch (error) {
     console.error(`Error deleting gallery for event ${eventId}:`, error);
     throw error;
