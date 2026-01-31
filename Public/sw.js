@@ -1,8 +1,8 @@
 // Service Worker for offline caching of static assets and media
-// High Performance Edition with Video Streaming Support
-const CACHE_NAME = 'eventhub-v3';
+// High Performance Edition with Video Streaming Support & Network Resilience
+const CACHE_NAME = 'eventhub-v4';
 const MEDIA_CACHE_NAME = 'eventhub-media-v2';
-const VIDEO_CACHE_NAME = 'eventhub-video-v1';
+const VIDEO_CACHE_NAME = 'eventhub-video-v2';
 const API_CACHE_NAME = 'eventhub-api-v1';
 
 const STATIC_ASSETS = [
@@ -156,63 +156,156 @@ const trimVideoCache = async () => {
   }
 };
 
-// Handle video range requests for smooth streaming
+// Handle video range requests for smooth streaming with offline resilience
 const handleVideoRangeRequest = async (request) => {
   const cache = await caches.open(VIDEO_CACHE_NAME);
-  const cachedResponse = await cache.match(request, { ignoreSearch: true });
+  const url = new URL(request.url);
+  
+  // Try to match without range for the full video (base URL without query params for range)
+  const baseRequest = new Request(url.origin + url.pathname);
+  const cachedResponse = await cache.match(baseRequest);
   
   // Get range header
   const range = request.headers.get('range');
   
-  if (cachedResponse && range) {
-    const blob = await cachedResponse.blob();
-    const size = blob.size;
-    
-    // Parse range header (e.g., "bytes=0-1023")
-    const [start, end] = range.replace(/bytes=/, '').split('-').map(Number);
-    const chunkEnd = end || Math.min(start + 1024 * 1024, size - 1); // 1MB chunks
-    const chunk = blob.slice(start, chunkEnd + 1);
-    
-    return new Response(chunk, {
-      status: 206,
-      statusText: 'Partial Content',
-      headers: {
-        'Content-Type': cachedResponse.headers.get('Content-Type') || 'video/mp4',
-        'Content-Range': `bytes ${start}-${chunkEnd}/${size}`,
-        'Accept-Ranges': 'bytes',
-        'Content-Length': chunk.size,
-        'Cache-Control': 'public, max-age=31536000',
+  // If we have cached video, serve range from it (offline-first for buffered content)
+  if (cachedResponse) {
+    try {
+      const blob = await cachedResponse.blob();
+      const size = blob.size;
+      
+      if (range) {
+        // Parse range header (e.g., "bytes=0-1023")
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10) || 0;
+        const end = parts[1] ? parseInt(parts[1], 10) : Math.min(start + 2 * 1024 * 1024 - 1, size - 1); // 2MB chunks
+        const chunkEnd = Math.min(end, size - 1);
+        const chunk = blob.slice(start, chunkEnd + 1);
+        
+        return new Response(chunk, {
+          status: 206,
+          statusText: 'Partial Content',
+          headers: {
+            'Content-Type': cachedResponse.headers.get('Content-Type') || 'video/mp4',
+            'Content-Range': `bytes ${start}-${chunkEnd}/${size}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunk.size,
+            'Cache-Control': 'public, max-age=31536000, immutable',
+            'X-Served-From': 'sw-cache'
+          }
+        });
+      } else {
+        // No range, serve full cached video
+        return new Response(blob, {
+          status: 200,
+          headers: {
+            'Content-Type': cachedResponse.headers.get('Content-Type') || 'video/mp4',
+            'Content-Length': size,
+            'Accept-Ranges': 'bytes',
+            'Cache-Control': 'public, max-age=31536000, immutable',
+            'X-Served-From': 'sw-cache'
+          }
+        });
       }
-    });
+    } catch (e) {
+      console.warn('Error serving from cache:', e);
+    }
   }
   
-  // Not in cache or no range request, fetch from network
+  // Not in cache, fetch from network
   try {
     const response = await fetch(request);
     
-    // Clone and cache the full video for future range requests
-    if (response.ok && response.headers.get('content-type')?.includes('video')) {
-      const cloned = response.clone();
-      // Add last access time header
-      const headers = new Headers(cloned.headers);
-      headers.set('x-last-access', Date.now().toString());
-      
-      const newResponse = new Response(await cloned.blob(), {
-        status: cloned.status,
-        statusText: cloned.statusText,
-        headers
-      });
-      
-      cache.put(request, newResponse).then(() => trimVideoCache());
+    // Cache the full video for future offline use (only if successful)
+    if (response.ok || response.status === 206) {
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('video')) {
+        // Clone response for caching
+        const clonedResponse = response.clone();
+        
+        // For partial content, we need to fetch the full video to cache
+        if (response.status === 206) {
+          // Background fetch full video for caching
+          const contentRange = response.headers.get('content-range');
+          const totalSize = contentRange ? parseInt(contentRange.split('/')[1]) : null;
+          
+          if (totalSize && totalSize < MAX_VIDEO_CACHE_SIZE) {
+            // Fetch full video in background (don't block current response)
+            fetchFullVideoForCache(url.href, cache, totalSize);
+          }
+        } else {
+          // Full video response - cache it directly
+          const headers = new Headers(clonedResponse.headers);
+          headers.set('x-last-access', Date.now().toString());
+          headers.set('x-cached-at', Date.now().toString());
+          
+          const newResponse = new Response(await clonedResponse.blob(), {
+            status: 200,
+            statusText: 'OK',
+            headers
+          });
+          
+          cache.put(baseRequest, newResponse).then(() => trimVideoCache());
+        }
+      }
     }
     
     return response;
   } catch (err) {
-    // If network fails and we have cached version, return it
+    // Network failed - if we have any cached version, return it
     if (cachedResponse) {
-      return cachedResponse;
+      console.log('Network failed, serving from cache');
+      const blob = await cachedResponse.blob();
+      return new Response(blob, {
+        status: 200,
+        headers: {
+          'Content-Type': cachedResponse.headers.get('Content-Type') || 'video/mp4',
+          'Content-Length': blob.size,
+          'Accept-Ranges': 'bytes',
+          'X-Served-From': 'sw-cache-offline'
+        }
+      });
     }
-    throw err;
+    
+    // No cache and no network - return error response
+    return new Response('Video unavailable offline', {
+      status: 503,
+      statusText: 'Service Unavailable',
+      headers: {
+        'Content-Type': 'text/plain',
+        'X-Offline': 'true'
+      }
+    });
+  }
+};
+
+// Background fetch full video for caching (doesn't block current stream)
+const fetchFullVideoForCache = async (url, cache, expectedSize) => {
+  try {
+    const response = await fetch(url, {
+      headers: { 'Range': '' } // Request full file
+    });
+    
+    if (response.ok) {
+      const blob = await response.blob();
+      const headers = new Headers(response.headers);
+      headers.set('x-last-access', Date.now().toString());
+      headers.set('x-cached-at', Date.now().toString());
+      
+      const baseRequest = new Request(new URL(url).origin + new URL(url).pathname);
+      const newResponse = new Response(blob, {
+        status: 200,
+        statusText: 'OK',
+        headers
+      });
+      
+      await cache.put(baseRequest, newResponse);
+      console.log('Video cached for offline use:', url);
+      trimVideoCache();
+    }
+  } catch (e) {
+    // Silent fail - caching is opportunistic
+    console.warn('Background video caching failed:', e);
   }
 };
 

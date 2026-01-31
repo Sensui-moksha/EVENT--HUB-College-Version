@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 import { API_BASE_URL, prefetchVideo } from '../utils/api';
 
 interface VideoOptimizationOptions {
@@ -11,9 +11,13 @@ interface VideoOptimizationOptions {
    */
   preloadMetadata?: boolean;
   /**
-   * Buffer size in seconds
+   * Buffer size in seconds (how much to buffer ahead)
    */
   bufferSize?: number;
+  /**
+   * Enable aggressive buffering for smoother playback
+   */
+  aggressiveBuffering?: boolean;
 }
 
 interface VideoInfo {
@@ -36,7 +40,7 @@ export const useVideoOptimization = (
   currentIndex: number = 0,
   options: VideoOptimizationOptions = {}
 ) => {
-  const { prefetchAhead = 2, preloadMetadata = true } = options;
+  const { prefetchAhead = 2, preloadMetadata = true, aggressiveBuffering = true } = options;
   
   const prefetchedUrls = useRef<Set<string>>(new Set());
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
@@ -113,7 +117,7 @@ export const useVideoOptimization = (
     return video;
   }, [getVideoUrl, preloadMetadata]);
 
-  // Get video props optimized for React
+  // Get video props optimized for React with YouTube-like buffering
   const getVideoProps = useCallback((
     url: string,
     options: {
@@ -125,13 +129,15 @@ export const useVideoOptimization = (
       onLoadedMetadata?: () => void;
       onCanPlay?: () => void;
       onError?: (e: React.SyntheticEvent<HTMLVideoElement>) => void;
+      onProgress?: (buffered: number, duration: number) => void;
     } = {}
-  ): React.VideoHTMLAttributes<HTMLVideoElement> => {
+  ): React.VideoHTMLAttributes<HTMLVideoElement> & { ref?: React.RefCallback<HTMLVideoElement> } => {
     const fullUrl = getVideoUrl(url);
     
     return {
       src: fullUrl,
-      preload: preloadMetadata ? 'metadata' : 'none',
+      // Use 'auto' for aggressive buffering (loads video ahead like YouTube)
+      preload: aggressiveBuffering ? 'auto' : (preloadMetadata ? 'metadata' : 'none'),
       playsInline: true,
       crossOrigin: 'anonymous',
       autoPlay: options.autoplay,
@@ -142,6 +148,14 @@ export const useVideoOptimization = (
       onLoadedMetadata: options.onLoadedMetadata,
       onCanPlay: options.onCanPlay,
       onError: options.onError,
+      // Track buffering progress
+      onProgress: options.onProgress ? (e) => {
+        const video = e.currentTarget;
+        if (video.buffered.length > 0) {
+          const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+          options.onProgress?.(bufferedEnd, video.duration);
+        }
+      } : undefined,
       // Performance optimizations
       style: {
         // Hardware acceleration
@@ -149,7 +163,7 @@ export const useVideoOptimization = (
         willChange: 'transform',
       }
     };
-  }, [getVideoUrl, preloadMetadata]);
+  }, [getVideoUrl, preloadMetadata, aggressiveBuffering]);
 
   // Preload specific video
   const preloadVideo = useCallback((url: string) => {
@@ -177,10 +191,47 @@ export const useVideoOptimization = (
 };
 
 /**
- * Hook for video player state management
+ * Hook for video player state management with buffering info
+ * Provides YouTube-like buffer progress tracking
  */
 export const useVideoPlayer = (_videoUrl?: string) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [bufferProgress, setBufferProgress] = useState(0); // 0-100%
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [loadedSeconds, setLoadedSeconds] = useState(0);
+  
+  // Monitor buffer state
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    
+    const updateBuffer = () => {
+      if (video.buffered.length > 0) {
+        const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+        const duration = video.duration || 1;
+        setBufferProgress(Math.min(100, (bufferedEnd / duration) * 100));
+        setLoadedSeconds(bufferedEnd);
+      }
+    };
+    
+    const handleWaiting = () => setIsBuffering(true);
+    const handlePlaying = () => setIsBuffering(false);
+    const handleCanPlay = () => setIsBuffering(false);
+    
+    video.addEventListener('progress', updateBuffer);
+    video.addEventListener('waiting', handleWaiting);
+    video.addEventListener('playing', handlePlaying);
+    video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('loadeddata', updateBuffer);
+    
+    return () => {
+      video.removeEventListener('progress', updateBuffer);
+      video.removeEventListener('waiting', handleWaiting);
+      video.removeEventListener('playing', handlePlaying);
+      video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('loadeddata', updateBuffer);
+    };
+  }, []);
   
   const play = useCallback(() => {
     videoRef.current?.play().catch(console.warn);
@@ -221,6 +272,21 @@ export const useVideoPlayer = (_videoUrl?: string) => {
       console.warn('Fullscreen not supported:', e);
     }
   }, []);
+  
+  // Get buffer ranges for visualization (like YouTube's grey bar)
+  const getBufferRanges = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !video.buffered.length) return [];
+    
+    const ranges: { start: number; end: number }[] = [];
+    for (let i = 0; i < video.buffered.length; i++) {
+      ranges.push({
+        start: video.buffered.start(i),
+        end: video.buffered.end(i)
+      });
+    }
+    return ranges;
+  }, []);
 
   return {
     videoRef,
@@ -230,6 +296,11 @@ export const useVideoPlayer = (_videoUrl?: string) => {
     setVolume,
     toggleMute,
     toggleFullscreen,
+    // Buffer info
+    bufferProgress,
+    isBuffering,
+    loadedSeconds,
+    getBufferRanges,
   };
 };
 

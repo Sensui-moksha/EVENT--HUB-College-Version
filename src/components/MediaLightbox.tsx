@@ -60,6 +60,13 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, initialInde
   const [bufferedProgress, setBufferedProgress] = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
   
+  // Network resilience state
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [networkError, setNetworkError] = useState(false);
+  const [bufferedSeconds, setBufferedSeconds] = useState(0);
+  const [wasPlayingBeforeError, setWasPlayingBeforeError] = useState(false);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
@@ -67,6 +74,96 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, initialInde
   const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const current = media[currentIndex];
+
+  // ==================== Network Resilience ====================
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      setNetworkError(false);
+      // Resume loading when back online
+      if (videoRef.current && current?.type === 'video') {
+        const video = videoRef.current;
+        const currentSrc = video.src;
+        // Reload video from current position
+        const currentPos = video.currentTime;
+        video.load();
+        video.currentTime = currentPos;
+        if (wasPlayingBeforeError) {
+          video.play().catch(console.warn);
+        }
+      }
+    };
+    
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [current?.type, wasPlayingBeforeError]);
+
+  // Handle video stall/error - continue playing from buffer
+  const handleVideoStall = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    
+    // Check if we have buffered data ahead
+    const bufferedAhead = getBufferedAhead(video);
+    
+    if (bufferedAhead > 0.5) {
+      // We have buffer, keep playing - just show a subtle indicator
+      setNetworkError(true);
+      setIsBuffering(false); // Don't show buffering if we have data
+    } else {
+      // No buffer left, show buffering
+      setIsBuffering(true);
+      setNetworkError(true);
+    }
+  };
+
+  // Get how many seconds are buffered ahead of current position
+  const getBufferedAhead = (video: HTMLVideoElement): number => {
+    if (!video.buffered.length) return 0;
+    
+    for (let i = 0; i < video.buffered.length; i++) {
+      const start = video.buffered.start(i);
+      const end = video.buffered.end(i);
+      
+      if (video.currentTime >= start && video.currentTime <= end) {
+        return end - video.currentTime;
+      }
+    }
+    return 0;
+  };
+
+  // Retry loading video on network error
+  const retryVideoLoad = () => {
+    const video = videoRef.current;
+    if (!video || !isOnline) return;
+    
+    const currentPos = video.currentTime;
+    video.load();
+    video.currentTime = currentPos;
+    video.play().catch(() => {
+      // If still failing, retry after delay
+      retryTimeoutRef.current = setTimeout(retryVideoLoad, 3000);
+    });
+  };
+
+  // Cleanup retry timeout
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Navigation functions
   const handlePrevious = () => {
@@ -85,6 +182,9 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, initialInde
     setZoomLevel(1);
     setBufferedProgress(0);
     setIsBuffering(false);
+    setNetworkError(false);
+    setBufferedSeconds(0);
+    setWasPlayingBeforeError(false);
   };
 
   // Swipe handlers for touch devices
@@ -423,27 +523,59 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, initialInde
               onTouchEnd={handleTouchEnd}
               onTimeUpdate={(e) => {
                 setCurrentTime(e.currentTarget.currentTime);
-                // Update buffered progress
+                // Update buffered progress and track seconds ahead
                 if (e.currentTarget.buffered.length > 0) {
                   const bufferedEnd = e.currentTarget.buffered.end(e.currentTarget.buffered.length - 1);
                   setBufferedProgress((bufferedEnd / e.currentTarget.duration) * 100);
+                  // Track how many seconds of buffer are ahead of current time
+                  const secondsAhead = bufferedEnd - e.currentTarget.currentTime;
+                  setBufferedSeconds(Math.max(0, secondsAhead));
                 }
               }}
               onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
               onEnded={() => setIsPlaying(false)}
-              onWaiting={() => setIsBuffering(true)}
-              onCanPlay={() => setIsBuffering(false)}
+              onWaiting={(e) => {
+                // Only show buffering if we're truly out of buffer
+                const bufferedAhead = getBufferedAhead(e.currentTarget);
+                if (bufferedAhead < 0.5) {
+                  setIsBuffering(true);
+                }
+              }}
+              onCanPlay={() => {
+                setIsBuffering(false);
+                setNetworkError(false);
+              }}
+              onCanPlayThrough={() => {
+                setIsBuffering(false);
+                setNetworkError(false);
+              }}
               onProgress={(e) => {
                 // Track buffered chunks for streaming
                 if (e.currentTarget.buffered.length > 0) {
                   const bufferedEnd = e.currentTarget.buffered.end(e.currentTarget.buffered.length - 1);
                   setBufferedProgress((bufferedEnd / e.currentTarget.duration) * 100);
+                  setBufferedSeconds(Math.max(0, bufferedEnd - e.currentTarget.currentTime));
+                }
+              }}
+              onStalled={handleVideoStall}
+              onError={(e) => {
+                // Handle video errors gracefully - continue if we have buffer
+                const bufferedAhead = getBufferedAhead(e.currentTarget as HTMLVideoElement);
+                if (bufferedAhead > 1) {
+                  // We have buffer, keep playing
+                  console.log('Video error but buffer available:', bufferedAhead.toFixed(1), 'seconds');
+                  setNetworkError(true);
+                } else if (!isOnline) {
+                  // Offline and no buffer - show error
+                  setNetworkError(true);
+                  setIsBuffering(false);
                 }
               }}
               playsInline
-              preload="metadata"
+              preload="auto"
+              crossOrigin="anonymous"
             >
               <source src={current.publicUrl} type="video/mp4" />
               <source src={current.publicUrl} type="video/webm" />
@@ -456,6 +588,42 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, initialInde
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-12 h-12 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
                   <span className="text-white text-sm">Buffering...</span>
+                </div>
+              </div>
+            )}
+
+            {/* Network Status Indicator - Shows when offline but playing from buffer */}
+            {(!isOnline || networkError) && !isBuffering && bufferedSeconds > 0 && (
+              <div className="absolute top-4 left-4 right-4 sm:top-6 sm:left-6 sm:right-auto">
+                <div className="bg-yellow-500/90 text-black px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 text-sm font-medium">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728m-3.536-3.536a5 5 0 010-7.07M6 12h.01M12 12h.01M18 12h.01" />
+                  </svg>
+                  <span>Playing from buffer • {Math.floor(bufferedSeconds)}s remaining</span>
+                </div>
+              </div>
+            )}
+
+            {/* Offline Error - No buffer remaining */}
+            {(!isOnline || networkError) && bufferedSeconds <= 0.5 && !isBuffering && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg">
+                <div className="flex flex-col items-center gap-3 text-center px-4">
+                  <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728M5.636 5.636a9 9 0 000 12.728m12.728-12.728L5.636 18.364m0-12.728L18.364 18.364" />
+                    </svg>
+                  </div>
+                  <span className="text-white text-lg font-medium">Connection Lost</span>
+                  <span className="text-white/70 text-sm">Waiting for network to reconnect...</span>
+                  <button
+                    onClick={retryVideoLoad}
+                    className="mt-2 px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Retry
+                  </button>
                 </div>
               </div>
             )}

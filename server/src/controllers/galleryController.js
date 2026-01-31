@@ -65,44 +65,80 @@ export const serveMedia = async (req, res) => {
     // ==================== GridFS Storage (New - Faster) ====================
     if (media.storageType === 'gridfs' && media.gridFSFileId) {
       try {
-        // For range requests (video seeking), use streaming
-        if (range && isVideo) {
-          const parts = range.replace(/bytes=/, '').split('-');
-          const start = parseInt(parts[0], 10);
-          const end = parts[1] ? parseInt(parts[1], 10) : undefined;
-          
-          const streamData = await streamWithRange(fileName, { start, end });
-          
-          res.status(206); // Partial Content
-          res.setHeader('Content-Range', `bytes ${streamData.start}-${streamData.end}/${streamData.fileSize}`);
-          res.setHeader('Accept-Ranges', 'bytes');
-          res.setHeader('Content-Length', streamData.contentLength);
-          res.setHeader('Content-Type', media.mimeType);
-          res.setHeader('Cache-Control', 'public, max-age=604800');
-          res.setHeader('X-Storage', 'GridFS');
-          
-          streamData.stream.pipe(res);
-          return;
-        }
-        
-        // Full file download/view
         const fileInfo = await getFileInfo(fileName);
         if (!fileInfo) {
-          // Fall back to Base64 if GridFS file not found
           logger.production(`GridFS file not found for ${fileName}, checking Base64...`);
         } else {
+          const fileSize = fileInfo.length;
+          
+          // For videos, always handle range requests for smooth playback
+          if (isVideo) {
+            // Default chunk size for video buffering (2MB chunks for smooth ahead-loading)
+            const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB - optimal for streaming
+            
+            let start = 0;
+            let end = fileSize - 1;
+            
+            if (range) {
+              // Parse range header: "bytes=start-end"
+              const parts = range.replace(/bytes=/, '').split('-');
+              start = parseInt(parts[0], 10);
+              // If end is not specified, serve a chunk (enables ahead-loading)
+              end = parts[1] ? parseInt(parts[1], 10) : Math.min(start + CHUNK_SIZE - 1, fileSize - 1);
+            } else {
+              // No range requested - serve first chunk to start buffering quickly
+              end = Math.min(CHUNK_SIZE - 1, fileSize - 1);
+            }
+            
+            // Ensure valid range
+            start = Math.max(0, start);
+            end = Math.min(end, fileSize - 1);
+            const contentLength = end - start + 1;
+            
+            // Stream the requested range
+            const streamData = await streamWithRange(fileName, { start, end });
+            
+            // HTTP 206 Partial Content for range requests (enables seeking & buffering)
+            res.status(206);
+            res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+            res.setHeader('Accept-Ranges', 'bytes');
+            res.setHeader('Content-Length', contentLength);
+            res.setHeader('Content-Type', media.mimeType);
+            
+            // Aggressive caching for video chunks (7 days)
+            res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+            res.setHeader('ETag', `"${fileName}-${start}-${end}"`);
+            res.setHeader('X-Storage', 'GridFS');
+            res.setHeader('X-Content-Duration', media.duration || '');
+            
+            // CORS headers for video players
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Headers', 'Range');
+            res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
+            
+            // Timing headers for debugging
+            res.setHeader('X-Chunk-Size', CHUNK_SIZE);
+            res.setHeader('X-Served-Range', `${start}-${end}`);
+            
+            streamData.stream.on('error', (err) => {
+              console.error('Video stream error:', err);
+              if (!res.headersSent) {
+                res.status(500).json({ error: 'Failed to stream video' });
+              }
+            });
+            
+            streamData.stream.pipe(res);
+            return;
+          }
+          
+          // For images - serve full file with caching
           res.setHeader('Content-Type', media.mimeType);
           res.setHeader('Content-Disposition', `inline; filename="${media.fileName}"`);
           res.setHeader('Accept-Ranges', 'bytes');
-          res.setHeader('Content-Length', fileInfo.length);
+          res.setHeader('Content-Length', fileSize);
           res.setHeader('ETag', `"${fileName}"`);
           res.setHeader('X-Storage', 'GridFS');
-          
-          if (isVideo) {
-            res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
-          } else {
-            res.setHeader('Cache-Control', 'public, max-age=86400');
-          }
+          res.setHeader('Cache-Control', 'public, max-age=86400');
           
           const downloadStream = downloadFromGridFS(fileName);
           downloadStream.on('error', (err) => {
@@ -146,36 +182,51 @@ export const serveMedia = async (req, res) => {
 
     const fileSize = cachedBuffer.length;
     
-    // Handle Range requests for video streaming
-    if (range && isVideo) {
-      const parts = range.replace(/bytes=/, '').split('-');
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-      const chunkSize = end - start + 1;
+    // Handle video streaming with chunked responses for smooth playback
+    if (isVideo) {
+      const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB chunks
+      
+      let start = 0;
+      let end = fileSize - 1;
+      
+      if (range) {
+        const parts = range.replace(/bytes=/, '').split('-');
+        start = parseInt(parts[0], 10);
+        end = parts[1] ? parseInt(parts[1], 10) : Math.min(start + CHUNK_SIZE - 1, fileSize - 1);
+      } else {
+        // No range - serve first chunk for quick start
+        end = Math.min(CHUNK_SIZE - 1, fileSize - 1);
+      }
+      
+      // Ensure valid range
+      start = Math.max(0, start);
+      end = Math.min(end, fileSize - 1);
+      const contentLength = end - start + 1;
       
       const chunk = cachedBuffer.slice(start, end + 1);
       
-      res.status(206);
+      res.status(206); // Partial Content
       res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
       res.setHeader('Accept-Ranges', 'bytes');
-      res.setHeader('Content-Length', chunkSize);
+      res.setHeader('Content-Length', contentLength);
       res.setHeader('Content-Type', media.mimeType);
-      res.setHeader('Cache-Control', 'public, max-age=604800');
+      res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+      res.setHeader('ETag', `"${fileName}-${start}-${end}"`);
+      
+      // CORS headers for video players
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Headers', 'Range');
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
+      
       return res.send(chunk);
     }
 
-    // Set response headers for full file
+    // Set response headers for full file (images)
     res.setHeader('Content-Type', media.mimeType);
     res.setHeader('Content-Disposition', `inline; filename="${media.fileName}"`);
     res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Content-Length', fileSize);
-    
-    if (isVideo) {
-      res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
-    } else {
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-    }
-    
+    res.setHeader('Cache-Control', 'public, max-age=86400');
     res.setHeader('ETag', `"${fileName}"`);
 
     // Send file
