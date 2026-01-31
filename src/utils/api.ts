@@ -73,16 +73,16 @@ export const API_BASE_URL = getApiBaseUrl();
  * Helper function to build full API URLs
  * Ensures consistent path construction across the app
  * 
- * @param path - API endpoint path (with or without leading slash)
+ * @param path - API endpoint path (should start with / or /api/)
  * @returns Full API URL
  * 
  * @example
- * getApiUrl('events') -> 'http://localhost:5001/events'
- * getApiUrl('/events/123') -> 'http://localhost:5001/events/123'
+ * getApiUrl('/api/events') -> 'https://events.mictech.dpdns.org/api/events'
+ * getApiUrl('/events') -> 'https://events.mictech.dpdns.org/events'
  */
 export const getApiUrl = (path: string): string => {
-  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
-  return `${API_BASE_URL}/${cleanPath}`;
+  // Don't strip leading slash - paths should include full path like /api/events
+  return `${API_BASE_URL}${path}`;
 };
 
 /**

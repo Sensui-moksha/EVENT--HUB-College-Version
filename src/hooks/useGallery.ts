@@ -96,7 +96,7 @@ export const useGallery = (eventId: string) => {
 
   const fetchGalleryFromServer = async () => {
     try {
-      const data = await apiRequest(`gallery/${eventId}`);
+      const data = await apiRequest(`/api/gallery/${eventId}`);
       // Cache the result
       cacheManager.set(cacheKeys.gallery(eventId), {
         gallery: data.gallery,
@@ -141,7 +141,7 @@ export const useGalleryUpload = (eventId: string) => {
           formData.append('files', file);
         });
 
-        const url = getApiUrl(`gallery/${eventId}/upload`);
+        const url = getApiUrl(`/api/gallery/${eventId}/upload`);
 
         const xhr = new XMLHttpRequest();
         
@@ -218,7 +218,7 @@ export const useGalleryManagement = (eventId: string) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiRequest(`gallery/${eventId}/manage`);
+      const data = await apiRequest(`/api/gallery/${eventId}/manage`);
       setGalleryData(data.gallery);
       setMedia(data.media || []);
       setStats(data.stats);
@@ -232,7 +232,7 @@ export const useGalleryManagement = (eventId: string) => {
   const deleteMedia = useCallback(
     async (mediaId: string): Promise<boolean> => {
       try {
-        await apiRequest(`gallery/media/${mediaId}`, { method: 'DELETE' });
+        await apiRequest(`/api/gallery/media/${mediaId}`, { method: 'DELETE' });
         setMedia((prev) => prev.filter((m) => m._id !== mediaId));
         // Invalidate cache after deletion
         invalidateCache.onGalleryChange(eventId);
@@ -248,7 +248,7 @@ export const useGalleryManagement = (eventId: string) => {
   const reorderMedia = useCallback(
     async (mediaOrder: string[]): Promise<boolean> => {
       try {
-        await apiRequest(`gallery/${eventId}/reorder`, {
+        await apiRequest(`/api/gallery/${eventId}/reorder`, {
           method: 'PATCH',
           body: JSON.stringify({ mediaOrder }),
         });
@@ -268,7 +268,7 @@ export const useGalleryManagement = (eventId: string) => {
   const setCoverImage = useCallback(
     async (mediaId: string): Promise<boolean> => {
       try {
-        const data = await apiRequest(`gallery/${eventId}/cover`, {
+        const data = await apiRequest(`/api/gallery/${eventId}/cover`, {
           method: 'PATCH',
           body: JSON.stringify({ mediaId }),
         });
@@ -287,7 +287,7 @@ export const useGalleryManagement = (eventId: string) => {
   const removeCoverImage = useCallback(
     async (): Promise<boolean> => {
       try {
-        const data = await apiRequest(`gallery/${eventId}/cover`, {
+        const data = await apiRequest(`/api/gallery/${eventId}/cover`, {
           method: 'PATCH',
           body: JSON.stringify({ mediaId: null }),
         });
@@ -306,7 +306,7 @@ export const useGalleryManagement = (eventId: string) => {
   const togglePublish = useCallback(
     async (published: boolean): Promise<boolean> => {
       try {
-        const data = await apiRequest(`gallery/${eventId}/publish`, {
+        const data = await apiRequest(`/api/gallery/${eventId}/publish`, {
           method: 'PATCH',
           body: JSON.stringify({ published }),
         });
@@ -369,7 +369,7 @@ export const useGalleryList = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiRequest(`gallery?page=${page}&limit=${limit}`);
+      const data = await apiRequest(`/api/gallery?page=${page}&limit=${limit}`);
       // Cache the result
       cacheManager.set(cacheKey, {
         galleries: data.galleries || [],
@@ -395,5 +395,5 @@ export const useGalleryList = () => {
  * Helper to get media URL from MongoDB storage
  */
 export const getMediaUrl = (fileName: string): string => {
-  return `${API_BASE_URL}/gallery/media/${fileName}`;
+  return `${API_BASE_URL}/api/gallery/media/${fileName}`;
 };
