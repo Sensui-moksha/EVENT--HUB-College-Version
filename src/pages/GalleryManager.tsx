@@ -39,7 +39,7 @@ export const GalleryManager: React.FC = () => {
     refetch
   } = useGalleryManagement(eventId || '');
 
-  const { uploading, uploadError, uploadProgress, uploadFiles } = useGalleryUpload(eventId || '');
+  const { uploading, uploadError, uploadProgress, uploadSpeed, timeRemaining, uploadFiles } = useGalleryUpload(eventId || '');
 
   const handleFileUpload = async (files: File[]) => {
     try {
@@ -217,6 +217,8 @@ export const GalleryManager: React.FC = () => {
               onFilesSelected={handleFileUpload}
               isLoading={uploading}
               uploadProgress={uploadProgress}
+              uploadSpeed={uploadSpeed}
+              timeRemaining={timeRemaining}
               acceptedTypes={['image/*', 'video/*']}
               multiple={true}
             />

@@ -129,12 +129,16 @@ export const useGalleryUpload = (eventId: string) => {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadSpeed, setUploadSpeed] = useState<number | null>(null); // bytes per second
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null); // seconds
 
   const uploadFiles = useCallback(
     async (files: File[]): Promise<GalleryMedia[]> => {
       setUploading(true);
       setUploadError(null);
       setUploadProgress(0);
+      setUploadSpeed(null);
+      setTimeRemaining(null);
 
       return new Promise((resolve, reject) => {
         const formData = new FormData();
@@ -150,11 +154,45 @@ export const useGalleryUpload = (eventId: string) => {
         // Set timeout to 15 minutes for large video uploads
         xhr.timeout = 15 * 60 * 1000; // 15 minutes
         
-        // Track upload progress
+        // Track upload progress with speed calculation
+        let lastLoaded = 0;
+        let lastTime = Date.now();
+        let smoothedProgress = 0;
+        const speedSamples: number[] = [];
+        const MAX_SAMPLES = 5; // Average over last 5 samples for smoother speed
+        
         xhr.upload.addEventListener('progress', (event) => {
           if (event.lengthComputable) {
-            const percentComplete = Math.round((event.loaded / event.total) * 100);
-            setUploadProgress(percentComplete);
+            const now = Date.now();
+            const timeDelta = (now - lastTime) / 1000; // seconds
+            const bytesDelta = event.loaded - lastLoaded;
+            
+            // Calculate instantaneous speed
+            if (timeDelta > 0.1) { // Only update if enough time has passed
+              const instantSpeed = bytesDelta / timeDelta;
+              speedSamples.push(instantSpeed);
+              if (speedSamples.length > MAX_SAMPLES) {
+                speedSamples.shift();
+              }
+              
+              // Calculate average speed from samples
+              const avgSpeed = speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length;
+              setUploadSpeed(avgSpeed);
+              
+              // Calculate time remaining
+              const bytesRemaining = event.total - event.loaded;
+              if (avgSpeed > 0) {
+                setTimeRemaining(Math.ceil(bytesRemaining / avgSpeed));
+              }
+              
+              lastLoaded = event.loaded;
+              lastTime = now;
+            }
+            
+            // Smooth progress to avoid jumps (interpolate towards actual)
+            const actualProgress = (event.loaded / event.total) * 100;
+            smoothedProgress = smoothedProgress + (actualProgress - smoothedProgress) * 0.3;
+            setUploadProgress(Math.round(smoothedProgress));
           }
         });
 
@@ -210,7 +248,7 @@ export const useGalleryUpload = (eventId: string) => {
     [eventId]
   );
 
-  return { uploading, uploadError, uploadProgress, uploadFiles };
+  return { uploading, uploadError, uploadProgress, uploadSpeed, timeRemaining, uploadFiles };
 };
 
 /**

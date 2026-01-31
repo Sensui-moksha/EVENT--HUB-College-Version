@@ -5,6 +5,8 @@ interface MediaUploaderProps {
   onFilesSelected: (files: File[]) => void;
   isLoading?: boolean;
   uploadProgress?: number;
+  uploadSpeed?: number | null; // bytes per second
+  timeRemaining?: number | null; // seconds
   acceptedTypes?: string[];
   multiple?: boolean;
 }
@@ -23,6 +25,8 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   onFilesSelected,
   isLoading = false,
   uploadProgress,
+  uploadSpeed,
+  timeRemaining,
   acceptedTypes = ['image/*', 'video/*'],
   multiple = true
 }) => {
@@ -114,6 +118,22 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
+  const formatSpeed = (bytesPerSecond: number | null | undefined) => {
+    if (!bytesPerSecond || bytesPerSecond <= 0) return '';
+    const k = 1024;
+    if (bytesPerSecond < k) return `${Math.round(bytesPerSecond)} B/s`;
+    if (bytesPerSecond < k * k) return `${(bytesPerSecond / k).toFixed(1)} KB/s`;
+    return `${(bytesPerSecond / (k * k)).toFixed(1)} MB/s`;
+  };
+
+  const formatTimeRemaining = (seconds: number | null | undefined) => {
+    if (!seconds || seconds <= 0) return '';
+    if (seconds < 60) return `${seconds}s remaining`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s remaining`;
+  };
+
   return (
     <div className="w-full">
       {/* Drop zone */}
@@ -199,11 +219,19 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                 <div 
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-500 ease-out"
                   style={{ width: `${uploadProgress || 0}%` }}
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-2 text-center">
+              <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+                <span>
+                  {uploadSpeed ? formatSpeed(uploadSpeed) : 'Calculating speed...'}
+                </span>
+                <span>
+                  {timeRemaining ? formatTimeRemaining(timeRemaining) : ''}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1 text-center">
                 Please wait while your files are being uploaded...
               </p>
             </div>

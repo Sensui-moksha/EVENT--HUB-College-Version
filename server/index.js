@@ -48,6 +48,9 @@ import { otpRoutes, mailRoutes } from './src/routes/index.js';
 import galleryRoutes from './src/routes/galleryRoutes.js';
 import * as galleryController from './src/controllers/galleryController.js';
 
+// GridFS for gallery media
+import { initializeGalleryGridFS } from './src/utils/galleryGridFS.js';
+
 // Health monitoring and maintenance imports
 import {
   performHealthCheck,
@@ -876,11 +879,16 @@ mongoose.connection.on('error', (err) => {
 
 connectToAtlas();
 
-// After connection, initialize GridFS bucket
+// After connection, initialize GridFS buckets
 mongoose.connection.on('connected', async () => {
   try {
+    // Initialize event images GridFS bucket (legacy)
     gridFsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'eventImages' });
-    console.log('GridFS bucket initialized.');
+    console.log('GridFS bucket (eventImages) initialized.');
+    
+    // Initialize gallery media GridFS bucket (new - for faster uploads)
+    initializeGalleryGridFS();
+    console.log('GridFS bucket (galleryMedia) initialized for high-performance uploads.');
     
     // Initialize mail system after DB connection
     await initializeMailSystem();

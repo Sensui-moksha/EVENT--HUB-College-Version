@@ -6,7 +6,8 @@ import mongoose from 'mongoose';
  * Represents individual media items (images/videos) within a gallery.
  * Many media items belong to one gallery (Many:1 relationship)
  * 
- * Files are stored directly in MongoDB as Base64 encoded data.
+ * Files are stored in MongoDB GridFS for efficient large file handling.
+ * The gridFSFileId references the file in the 'galleryMedia' GridFS bucket.
  */
 const galleryMediaSchema = new mongoose.Schema(
   {
@@ -29,9 +30,31 @@ const galleryMediaSchema = new mongoose.Schema(
       required: true
     },
 
+    // Original filename from user's upload
+    originalName: {
+      type: String,
+      required: false
+    },
+
+    // Legacy Base64 storage (for backward compatibility during migration)
     fileData: {
       type: String,
-      required: true
+      required: false, // No longer required - GridFS is primary
+      default: null
+    },
+
+    // GridFS file reference (primary storage)
+    gridFSFileId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: false, // Will be required after migration
+      index: true
+    },
+
+    // Storage type indicator for handling both old and new files
+    storageType: {
+      type: String,
+      enum: ['base64', 'gridfs'],
+      default: 'gridfs'
     },
 
     publicUrl: {
@@ -105,5 +128,7 @@ galleryMediaSchema.index({ galleryId: 1, order: 1 });
 galleryMediaSchema.index({ type: 1 });
 galleryMediaSchema.index({ uploadedAt: -1 });
 galleryMediaSchema.index({ fileName: 1 }, { unique: true });
+galleryMediaSchema.index({ gridFSFileId: 1 }); // Index for GridFS lookups
+galleryMediaSchema.index({ storageType: 1 }); // Index for storage type queries
 
 export default mongoose.model('GalleryMedia', galleryMediaSchema);
