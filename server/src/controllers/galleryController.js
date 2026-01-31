@@ -1400,16 +1400,25 @@ export const uploadChunk = async (req, res) => {
       return res.status(403).json({ error: 'Upload ID does not match event' });
     }
 
-    // Parse the chunk from the request body (binary data)
-    const chunks = [];
+    let chunkData;
     
-    await new Promise((resolve, reject) => {
-      req.on('data', chunk => chunks.push(chunk));
-      req.on('end', resolve);
-      req.on('error', reject);
-    });
-
-    const chunkData = Buffer.concat(chunks);
+    // Check if body was parsed by express.raw() middleware
+    if (Buffer.isBuffer(req.body) && req.body.length > 0) {
+      chunkData = req.body;
+    } else {
+      // Fallback: Read from stream if not already parsed
+      const chunks = [];
+      await new Promise((resolve, reject) => {
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', resolve);
+        req.on('error', reject);
+      });
+      chunkData = Buffer.concat(chunks);
+    }
+    
+    if (!chunkData || chunkData.length === 0) {
+      return res.status(400).json({ error: 'No chunk data received' });
+    }
     
     // Store chunk
     upload.receivedChunks.set(index, chunkData);

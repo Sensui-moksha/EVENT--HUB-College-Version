@@ -239,6 +239,17 @@ app.use((req, res, next) => {
   next();
 });
 
+// Raw body parser for chunked uploads (must be BEFORE express.json())
+// This allows binary chunk data to be received without JSON parsing
+app.use('/api/gallery', (req, res, next) => {
+  // Only use raw parser for chunk upload routes
+  if (req.path.includes('/upload-chunk/') && !req.path.endsWith('/init') && !req.path.endsWith('/complete')) {
+    express.raw({ type: 'application/octet-stream', limit: '10mb' })(req, res, next);
+  } else {
+    next();
+  }
+});
+
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 

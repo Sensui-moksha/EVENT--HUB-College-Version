@@ -222,13 +222,17 @@ export const useGalleryUpload = (eventId: string) => {
           const start = i * CHUNK_SIZE;
           const end = Math.min(start + CHUNK_SIZE, file.size);
           const chunk = file.slice(start, end);
+          const chunkSize = end - start;
           
           setUploadStatus(`Uploading chunk ${i + 1}/${totalChunks}...`);
           
           // Upload chunk with retry
           let retries = 3;
+          let lastError: Error | null = null;
           while (retries > 0) {
             try {
+              console.log(`[Chunked] Uploading chunk ${i + 1}/${totalChunks} (${(chunkSize / 1024).toFixed(1)}KB)`);
+              
               const chunkResponse = await fetch(
                 getApiUrl(`/api/gallery/${eventId}/upload-chunk/${uploadId}/${i}`),
                 {
@@ -243,17 +247,30 @@ export const useGalleryUpload = (eventId: string) => {
               );
               
               if (!chunkResponse.ok) {
-                const errorData = await chunkResponse.json().catch(() => ({}));
-                throw new Error(errorData.error || `Chunk upload failed: ${chunkResponse.status}`);
+                const errorText = await chunkResponse.text();
+                let errorMsg = `Chunk upload failed: ${chunkResponse.status}`;
+                try {
+                  const errorData = JSON.parse(errorText);
+                  errorMsg = errorData.error || errorMsg;
+                } catch { /* ignore */ }
+                throw new Error(errorMsg);
               }
               
+              const result = await chunkResponse.json();
+              console.log(`[Chunked] Chunk ${i + 1} uploaded:`, result);
+              
               uploadedChunks++;
-              onProgress(uploadedChunks * CHUNK_SIZE, file.size);
+              // Update progress based on actual bytes uploaded
+              onProgress(Math.min(uploadedChunks * CHUNK_SIZE, file.size), file.size);
               break; // Success, exit retry loop
             } catch (err) {
+              lastError = err instanceof Error ? err : new Error(String(err));
               retries--;
-              if (retries === 0) throw err;
-              console.log(`[Chunked] Retrying chunk ${i}, ${retries} attempts left`);
+              if (retries === 0) {
+                console.error(`[Chunked] Failed to upload chunk ${i} after all retries:`, lastError);
+                throw lastError;
+              }
+              console.log(`[Chunked] Retrying chunk ${i}, ${retries} attempts left. Error:`, lastError.message);
               await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
             }
           }
