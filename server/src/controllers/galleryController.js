@@ -514,7 +514,7 @@ export const getSubEventGalleries = async (req, res) => {
 
 /**
  * Upload media to gallery (admin/organizer only)
- * Files are saved directly to MongoDB as Base64 encoded data
+ * Files are saved directly to MongoDB GridFS for optimal performance
  * Supports multiple files, images and videos
  */
 export const uploadMedia = async (req, res) => {
@@ -525,6 +525,14 @@ export const uploadMedia = async (req, res) => {
 
     if (!files || files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    // Check if GridFS is available - REQUIRED
+    if (!isGridFSAvailable()) {
+      return res.status(503).json({ 
+        error: 'Storage system temporarily unavailable. Please try again in a moment.',
+        code: 'GRIDFS_UNAVAILABLE'
+      });
     }
 
     // Verify event and gallery exist
@@ -539,7 +547,7 @@ export const uploadMedia = async (req, res) => {
     if (!gallery) {
       gallery = new Gallery({
         eventId,
-        folderPath: `mongodb://gallery/${eventId}`,
+        folderPath: `gridfs://galleryMedia/${eventId}`,
         published: false
       });
       await gallery.save();
@@ -548,7 +556,7 @@ export const uploadMedia = async (req, res) => {
 
     const uploadedMedia = [];
 
-    // Process each file
+    // Process each file using GridFS
     for (const file of files) {
       if (!file) continue;
 
@@ -561,30 +569,34 @@ export const uploadMedia = async (req, res) => {
         // Generate unique filename
         const uniqueFileName = storageManager.generateUniqueFileName(file.originalname, mediaType);
         
-        // Convert file to Base64 for MongoDB storage
-        const fileBase64 = storageManager.fileToBase64(file.buffer);
+        // Upload to GridFS (faster than Base64)
+        const gridFSFileId = await uploadToGridFS(file.buffer, uniqueFileName, {
+          eventId,
+          galleryId: gallery._id.toString(),
+          originalName: file.originalname,
+          mimeType: file.mimetype,
+          mediaType,
+          uploadedBy: userId
+        });
 
         // Generate public URL (served from /api/gallery/media/:fileName endpoint)
         const publicUrl = `/api/gallery/media/${uniqueFileName}`;
 
-        // Get dimensions/duration if needed
-        let dimensions = null;
-        let duration = null;
-
-        // Create media document with Base64 data stored in MongoDB
-        // IMPORTANT: fileName must match the uniqueFileName used in publicUrl
+        // Create media document with GridFS reference (NO Base64)
         const media = new GalleryMedia({
           eventId,
           galleryId: gallery._id,
-          fileName: uniqueFileName,  // Use unique filename for URL lookup
-          originalName: file.originalname,  // Keep original name for display
-          fileData: fileBase64,  // BASE64 ENCODED FILE STORED DIRECTLY IN MONGODB
+          fileName: uniqueFileName,
+          originalName: file.originalname,
+          gridFSFileId: gridFSFileId, // GridFS file reference
+          storageType: 'gridfs', // Mark as GridFS storage
+          fileData: null, // No Base64 data
           publicUrl,
           type: mediaType,
           mimeType: file.mimetype,
           fileSize: file.size,
-          dimensions,
-          duration,
+          dimensions: null,
+          duration: null,
           order: uploadedMedia.length,
           uploadedBy: userId
         });
@@ -1020,10 +1032,13 @@ export const uploadMediaStream = async (req, res) => {
     return res.status(404).json({ error: 'Event not found' });
   }
 
-  // Check if GridFS is available
+  // Check if GridFS is available - REQUIRED, no fallback to Base64
   if (!isGridFSAvailable()) {
-    logger.production('GridFS not available, falling back to Base64 storage');
-    return uploadMediaStreamBase64(req, res, eventId, userId);
+    logger.production('GridFS not available - upload cannot proceed');
+    return res.status(503).json({ 
+      error: 'Storage system temporarily unavailable. Please try again in a moment.',
+      code: 'GRIDFS_UNAVAILABLE'
+    });
   }
 
   // Get or create gallery

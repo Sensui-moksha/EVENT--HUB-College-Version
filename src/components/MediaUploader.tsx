@@ -7,6 +7,8 @@ interface MediaUploaderProps {
   uploadProgress?: number;
   uploadSpeed?: number | null; // bytes per second
   timeRemaining?: number | null; // seconds
+  uploadedBytes?: number; // bytes uploaded
+  totalBytes?: number; // total bytes
   acceptedTypes?: string[];
   multiple?: boolean;
 }
@@ -27,6 +29,8 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   uploadProgress,
   uploadSpeed,
   timeRemaining,
+  uploadedBytes,
+  totalBytes,
   acceptedTypes = ['image/*', 'video/*'],
   multiple = true
 }) => {
@@ -215,22 +219,28 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
             <div className="mt-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-blue-600">Uploading...</span>
-                <span className="text-sm font-bold text-blue-600">{Math.round(uploadProgress || 0)}%</span>
+                <span className="text-sm font-bold text-blue-600">{(uploadProgress || 0).toFixed(1)}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                 <div 
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-500 ease-out"
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-150 ease-linear"
                   style={{ width: `${uploadProgress || 0}%` }}
                 />
               </div>
               <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
-                <span>
-                  {uploadSpeed ? formatSpeed(uploadSpeed) : 'Calculating speed...'}
+                <span className="font-medium">
+                  {uploadSpeed ? formatSpeed(uploadSpeed) : 'Calculating...'}
                 </span>
-                <span>
+                <span className="font-medium">
                   {timeRemaining ? formatTimeRemaining(timeRemaining) : ''}
                 </span>
               </div>
+              {/* Show bytes uploaded / total */}
+              {uploadedBytes !== undefined && totalBytes !== undefined && totalBytes > 0 && (
+                <div className="text-xs text-gray-400 mt-1 text-center">
+                  {formatFileSize(uploadedBytes)} / {formatFileSize(totalBytes)}
+                </div>
+              )}
               <p className="text-xs text-gray-500 mt-1 text-center">
                 Please wait while your files are being uploaded...
               </p>

@@ -93,10 +93,10 @@ const server = http.createServer(app);
 
 // Configure server timeouts for large file uploads
 // These settings prevent ERR_HTTP2_PROTOCOL_ERROR on slow/large uploads
-server.timeout = 10 * 60 * 1000; // 10 minutes for very large uploads
-server.keepAliveTimeout = 65 * 1000; // 65 seconds (slightly longer than typical LB timeout)
-server.headersTimeout = 66 * 1000; // Slightly longer than keepAliveTimeout
-server.requestTimeout = 10 * 60 * 1000; // 10 minutes for request processing
+server.timeout = 30 * 60 * 1000; // 30 minutes for very large uploads
+server.keepAliveTimeout = 120 * 1000; // 2 minutes (longer for slow connections)
+server.headersTimeout = 125 * 1000; // Slightly longer than keepAliveTimeout
+server.requestTimeout = 30 * 60 * 1000; // 30 minutes for request processing
 
 // Check if running in production
 const isProduction = process.env.NODE_ENV === 'production';
