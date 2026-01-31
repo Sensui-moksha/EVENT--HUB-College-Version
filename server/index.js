@@ -3841,6 +3841,27 @@ app.post('/api/login', async (req, res) => {
       logger.production('[Login] Session saved successfully. SessionID:', req.sessionID, 'Email:', userObj.email);
       // Expose session ID in header for debugging (safe to remove later)
       res.setHeader('X-Session-ID', req.sessionID);
+      // Ensure we explicitly set the session cookie on the response so we can
+      // observe it in logs and so browsers receive it even if middleware timing
+      // differs in this environment.
+      try {
+        const isProd = process.env.NODE_ENV === 'production';
+        const cookieDomain = process.env.SESSION_COOKIE_DOMAIN || undefined;
+        const sameSiteEnv = process.env.SESSION_SAME_SITE || (isProd ? 'none' : 'lax');
+        const cookieOpts = {
+          httpOnly: true,
+          secure: isProd,
+          sameSite: sameSiteEnv,
+          maxAge: 24 * 60 * 60 * 1000,
+          path: '/'
+        };
+        if (cookieDomain) cookieOpts.domain = cookieDomain;
+
+        res.cookie('connect.sid', req.sessionID, cookieOpts);
+        logger.production('[Login] Explicitly set connect.sid cookie with options:', cookieOpts);
+      } catch (e) {
+        logger.production('[Login] Failed to explicitly set cookie:', e && e.message);
+      }
       // Log the Set-Cookie header the server will send (helps confirm cookie emitted)
       try {
         const sc = res.getHeader('Set-Cookie');
