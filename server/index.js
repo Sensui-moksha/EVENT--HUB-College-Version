@@ -293,7 +293,13 @@ app.use(session({
     const isProd = process.env.NODE_ENV === 'production';
 
     const cookieOpts = {
-      secure: isProd, // must be true for SameSite='none'
+      // Allow explicit override for environments where NODE_ENV=production
+      // but the app is served over HTTP (e.g. preview instances).
+      // If SESSION_COOKIE_SECURE is set to 'true' or 'false' it will be used;
+      // otherwise we default to the conventional isProd value.
+      secure: (typeof process.env.SESSION_COOKIE_SECURE !== 'undefined')
+        ? (process.env.SESSION_COOKIE_SECURE === 'true')
+        : isProd,
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     };
@@ -3845,22 +3851,12 @@ app.post('/api/login', async (req, res) => {
       // observe it in logs and so browsers receive it even if middleware timing
       // differs in this environment.
       try {
-        const isProd = process.env.NODE_ENV === 'production';
-        const cookieDomain = process.env.SESSION_COOKIE_DOMAIN || undefined;
-        const sameSiteEnv = process.env.SESSION_SAME_SITE || (isProd ? 'none' : 'lax');
-        const cookieOpts = {
-          httpOnly: true,
-          secure: isProd,
-          sameSite: sameSiteEnv,
-          maxAge: 24 * 60 * 60 * 1000,
-          path: '/'
-        };
-        if (cookieDomain) cookieOpts.domain = cookieDomain;
-
-        res.cookie('connect.sid', req.sessionID, cookieOpts);
-        logger.production('[Login] Explicitly set connect.sid cookie with options:', cookieOpts);
+        // Do not manually set `connect.sid` here. Let `express-session`
+        // generate and sign the cookie. We still log the effective cookie
+        // flags so operators can verify them in the logs.
+        logger.production('[Login] Relying on express-session to emit Set-Cookie header.');
       } catch (e) {
-        logger.production('[Login] Failed to explicitly set cookie:', e && e.message);
+        logger.production('[Login] Cookie logging error:', e && e.message);
       }
       // Log the Set-Cookie header the server will send (helps confirm cookie emitted)
       try {
