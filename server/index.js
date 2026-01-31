@@ -17,6 +17,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import cron from 'node-cron';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import fs from 'fs';
 import multer from 'multer';
 // Removed direct GridFsStorage usage due to runtime crash (f._id undefined in multer-gridfs-storage with Node 25)
@@ -80,6 +81,9 @@ import { routeCache, cacheMiddleware, invalidateCacheMiddleware } from './src/mi
 
 // Production-safe logger
 import logger from './src/utils/logger.js';
+
+// Setup __dirname for ES modules
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const server = http.createServer(app);
@@ -11325,6 +11329,21 @@ app.get('/api/admin/rate-limits', (req, res) => {
 app.get('/api/admin/errors', (req, res) => {
   res.json(getErrorStats());
 });
+
+// ==================== STATIC FILES & SPA FALLBACK ====================
+// Serve static files from the built frontend
+const frontendPath = path.join(__dirname, '../dist');
+if (fs.existsSync(frontendPath)) {
+  app.use(express.static(frontendPath));
+  
+  // SPA fallback: serve index.html for all non-API routes
+  // This allows React Router to handle client-side routing
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
+} else {
+  logger.warn('⚠️ Frontend dist folder not found at', frontendPath, '- SPA routes will not work');
+}
 
 // 404 handler for unknown routes (must be after all routes)
 app.use(notFoundHandler);
