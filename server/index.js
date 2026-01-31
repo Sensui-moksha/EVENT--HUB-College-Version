@@ -11338,7 +11338,12 @@ if (fs.existsSync(frontendPath)) {
   
   // SPA fallback: serve index.html for all non-API routes
   // This allows React Router to handle client-side routing
+  // IMPORTANT: Only match routes that don't start with /api
   app.get('*', (req, res) => {
+    // Don't serve index.html for API routes
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: true, message: 'Route not found: ' + req.method + ' ' + req.path });
+    }
     res.sendFile(path.join(frontendPath, 'index.html'));
   });
 } else {
