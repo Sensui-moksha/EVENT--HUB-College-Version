@@ -266,11 +266,19 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax', // Allow cross-origin in dev
+    sameSite: 'lax', // Use lax for both dev and production to allow credentials
     // Don't set domain - let browser handle it based on request origin
     // domain will be set automatically to the request hostname
   }
 }));
+
+// Session debugging middleware - log when session is created/accessed
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/gallery')) {
+    logger.log('[Session] Path:', req.path, '| SessionID:', req.sessionID, '| Has user:', !!req.session?.user);
+  }
+  next();
+});
 
 // Serve uploaded images statically
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
@@ -324,6 +332,12 @@ app.get('/api/health/status', (req, res) => {
     database: {
       status: dbStateMap[dbState] || 'unknown',
       connected: dbState === 1
+    },
+    session: {
+      sessionID: req.sessionID,
+      hasSession: !!req.session,
+      hasUser: !!req.session?.user,
+      userEmail: req.session?.user?.email || null
     }
   });
 });
@@ -3748,10 +3762,11 @@ app.post('/api/login', async (req, res) => {
     // Explicitly save the session to the store before responding
     req.session.save((err) => {
       if (err) {
-        console.error('[Login] Session save error:', err);
+        logger.error('[Login] Session save error:', err);
         return res.status(500).json({ error: 'Failed to create session' });
       }
       
+      logger.log('[Login] Session saved successfully. SessionID:', req.sessionID, 'Email:', userObj.email);
       // Session-based authentication (no JWT tokens)
       res.json({ message: 'Login successful', user: userObj });
     });

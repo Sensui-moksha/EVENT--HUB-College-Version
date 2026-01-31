@@ -27,6 +27,14 @@ export const optionalAuth = (req, res, next) => {
  *   // User is authenticated, req.user contains the user data
  * });
  */
+/**
+ * Middleware to verify user is authenticated via session
+ * 
+ * Usage:
+ * app.get('/api/protected-route', authenticateToken, (req, res) => {
+ *   // User is authenticated, req.user contains the user data
+ * });
+ */
 export const authenticateToken = (req, res, next) => {
   // Check if user is in session (set during login)
   if (!req.session || !req.session.user) {
