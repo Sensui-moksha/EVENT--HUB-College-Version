@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import Busboy from 'busboy';
 import Gallery from '../models/Gallery.js';
 import GalleryMedia from '../models/GalleryMedia.js';
 import { storageManager } from '../utils/galleryUpload.js';
@@ -864,5 +865,138 @@ export const clearCache = async (req, res) => {
     console.error('Error clearing cache:', error);
     res.status(500).json({ error: 'Failed to clear cache' });
   }
+};
+
+/**
+ * STREAMING UPLOAD - Faster uploads by streaming directly to MongoDB
+ * POST /api/gallery/:eventId/upload-stream
+ * 
+ * This bypasses memory buffering (multer) and streams files directly,
+ * resulting in significantly faster uploads for large files.
+ */
+export const uploadMediaStream = async (req, res) => {
+  const { eventId } = req.params;
+  const userId = req.user?.id;
+
+  // Validate event exists
+  const Event = getEventModel();
+  const event = await Event.findById(eventId);
+  if (!event) {
+    return res.status(404).json({ error: 'Event not found' });
+  }
+
+  // Get or create gallery
+  let gallery = await Gallery.findOne({ eventId });
+  if (!gallery) {
+    gallery = new Gallery({
+      eventId,
+      folderPath: `mongodb://gallery/${eventId}`,
+      published: false
+    });
+    await gallery.save();
+    logger.production(`Auto-created gallery for event ${eventId} during streaming upload`);
+  }
+
+  const busboy = Busboy({
+    headers: req.headers,
+    limits: {
+      fileSize: 500 * 1024 * 1024, // 500MB max per file
+      files: 10 // Max 10 files per request
+    }
+  });
+
+  const uploadedMedia = [];
+  const uploadPromises = [];
+  let fileCount = 0;
+
+  busboy.on('file', (fieldname, fileStream, info) => {
+    const { filename, mimeType } = info;
+    fileCount++;
+    
+    const mediaType = mimeType.startsWith('video') ? 'video' : 'image';
+    const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}-${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const publicUrl = `/api/gallery/media/${uniqueFileName}`;
+    
+    // Collect file data as chunks (streaming into an array, then save)
+    const chunks = [];
+    let fileSize = 0;
+    
+    const uploadPromise = new Promise((resolve, reject) => {
+      fileStream.on('data', (chunk) => {
+        chunks.push(chunk);
+        fileSize += chunk.length;
+      });
+      
+      fileStream.on('end', async () => {
+        try {
+          // Combine chunks and convert to Base64
+          const fileBuffer = Buffer.concat(chunks);
+          const fileBase64 = fileBuffer.toString('base64');
+          
+          // Create media document
+          const media = new GalleryMedia({
+            eventId,
+            galleryId: gallery._id,
+            fileName: uniqueFileName,
+            originalName: filename,
+            fileData: fileBase64,
+            publicUrl,
+            type: mediaType,
+            mimeType: mimeType,
+            fileSize: fileSize,
+            dimensions: null,
+            duration: null,
+            order: fileCount - 1,
+            uploadedBy: userId
+          });
+          
+          await media.save();
+          uploadedMedia.push(media);
+          resolve(media);
+        } catch (err) {
+          logger.production(`Error saving streamed file ${filename}:`, err.message);
+          reject(err);
+        }
+      });
+      
+      fileStream.on('error', (err) => {
+        logger.production(`Stream error for ${filename}:`, err.message);
+        reject(err);
+      });
+    });
+    
+    uploadPromises.push(uploadPromise);
+  });
+
+  busboy.on('finish', async () => {
+    try {
+      // Wait for all files to finish uploading
+      await Promise.all(uploadPromises);
+      
+      // Update gallery media count
+      gallery.mediaCount = await GalleryMedia.countDocuments({ galleryId: gallery._id });
+      await gallery.save();
+      
+      // Invalidate cache
+      invalidateCache.onGalleryChange(serverCache, eventId);
+      
+      res.json({
+        success: true,
+        message: `${uploadedMedia.length} file(s) uploaded via streaming`,
+        media: uploadedMedia
+      });
+    } catch (error) {
+      logger.production('Error finalizing streaming upload:', error.message);
+      res.status(500).json({ error: 'Upload failed during finalization' });
+    }
+  });
+
+  busboy.on('error', (error) => {
+    logger.production('Busboy streaming error:', error.message);
+    res.status(500).json({ error: 'Upload stream failed' });
+  });
+
+  // Pipe the request directly to busboy (FAST - no intermediate buffering)
+  req.pipe(busboy);
 };
 

@@ -24,7 +24,7 @@ class GalleryStorageManager {
    */
   validateFile(file, mediaType = null) {
     const validImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    const validVideoTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo'];
+    const validVideoTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/x-matroska'];
     
     const isValidImage = validImageTypes.includes(file.mimetype);
     const isValidVideo = validVideoTypes.includes(file.mimetype);
@@ -33,15 +33,15 @@ class GalleryStorageManager {
       throw new Error(`Invalid file type: ${file.mimetype}`);
     }
 
-    const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
-    const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
+    const MAX_IMAGE_SIZE = 25 * 1024 * 1024; // 25MB for images
+    const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500MB for videos
     
     if (isValidImage && file.size > MAX_IMAGE_SIZE) {
-      throw new Error(`Image too large: ${(file.size / 1024 / 1024).toFixed(2)}MB (max 10MB)`);
+      throw new Error(`Image too large: ${(file.size / 1024 / 1024).toFixed(2)}MB (max 25MB)`);
     }
     
     if (isValidVideo && file.size > MAX_VIDEO_SIZE) {
-      throw new Error(`Video too large: ${(file.size / 1024 / 1024).toFixed(2)}MB (max 100MB)`);
+      throw new Error(`Video too large: ${(file.size / 1024 / 1024).toFixed(2)}MB (max 500MB)`);
     }
 
     return true;

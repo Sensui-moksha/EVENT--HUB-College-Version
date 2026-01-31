@@ -60,7 +60,8 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
         return file.type === type;
       });
 
-      const maxSize = file.type.startsWith('video/') ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+      // Increased limits: 25MB for images, 500MB for videos
+      const maxSize = file.type.startsWith('video/') ? 500 * 1024 * 1024 : 25 * 1024 * 1024;
       const isSizeValid = file.size <= maxSize;
 
       return isValidType && isSizeValid;
@@ -132,7 +133,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
           {isDragging ? 'Drop files here' : 'Drag files or click to browse'}
         </p>
         <p className="text-sm text-gray-500 mt-1">
-          Images up to 10MB, Videos up to 100MB
+          Images up to 25MB, Videos up to 500MB
         </p>
       </div>
 

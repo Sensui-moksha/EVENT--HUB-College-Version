@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast';
-import ImageUploadManager from '../components/ImageUploadManager';
 import {
   User,
   Mail,
@@ -11,7 +10,6 @@ import {
   Edit,
   Save,
   X,
-  Camera,
   Shield,
   Lock,
   Eye,
@@ -20,7 +18,7 @@ import {
 import { pageVariants, fadeInVariants } from '../utils/animations';
 
 const Profile: React.FC = () => {
-  const { user, updateProfile, changePassword, uploadAvatar, refreshUserData } = useAuth();
+  const { user, updateProfile, changePassword, refreshUserData } = useAuth();
   const { addToast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -54,8 +52,6 @@ const Profile: React.FC = () => {
     confirmPassword: ''
   });
   const [avatarPreview, setAvatarPreview] = useState(user?.avatar || '');
-  const [showImageManager, setShowImageManager] = useState(false);
-  const [uploadLoading, setUploadLoading] = useState(false);
   const [avatarShape, setAvatarShape] = useState<'circle' | 'square'>('circle');
   const [avatarSize, setAvatarSize] = useState<'sm' | 'md' | 'lg'>('md');
 
@@ -274,59 +270,6 @@ const Profile: React.FC = () => {
     }));
   };
 
-  
-
-  const handleUploadClick = () => {
-    setShowImageManager(true);
-  };
-
-  const handleImageChange = async (payload: any) => {
-    // payload: { mode: 'none' | 'upload', file?, blob?, previewUrl?, width?, height?, originalName?, deleted? }
-    if (payload.mode === 'upload' && payload.file) {
-      // Upload to server
-      try {
-        setUploadLoading(true);
-        const res = await uploadAvatar(payload.file);
-        if (res.success) {
-          const avatarUrl = res.avatarUrl || payload.previewUrl || '';
-          setFormData(prev => ({ ...prev, avatar: avatarUrl }));
-          setAvatarPreview(avatarUrl);
-          addToast({ type: 'success', title: 'Profile image uploaded', message: 'Your profile picture has been updated.' });
-          setShowImageManager(false);
-        } else {
-          addToast({ type: 'error', title: 'Upload failed', message: res.error || 'Failed to upload avatar.' });
-        }
-      } catch (err) {
-        console.error(err);
-        addToast({ type: 'error', title: 'Upload failed', message: 'An unexpected error occurred.' });
-      } finally {
-        setUploadLoading(false);
-      }
-    }
-    if (payload.mode === 'none' && payload.deleted) {
-      // Request backend delete
-      if (!user) return;
-      try {
-        setUploadLoading(true);
-        const userId = user._id || user.id;
-        const resp = await fetch(`/api/user/${userId}/avatar`, { method: 'DELETE' });
-        if (resp.ok) {
-          setFormData(prev => ({ ...prev, avatar: '' }));
-          setAvatarPreview('');
-          await refreshUserData();
-          addToast({ type: 'success', title: 'Avatar removed', message: 'Your profile picture was removed.' });
-        } else {
-          addToast({ type: 'error', title: 'Delete failed', message: 'Failed to remove avatar.' });
-        }
-      } catch (err) {
-        console.error(err);
-        addToast({ type: 'error', title: 'Delete failed', message: 'An unexpected error occurred.' });
-      } finally {
-        setUploadLoading(false);
-      }
-    }
-  };
-
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'admin':
@@ -398,15 +341,7 @@ const Profile: React.FC = () => {
                   );
                 })()}
                 <div className="absolute -bottom-1 -right-1 sm:bottom-0 sm:right-0 flex items-center gap-2">
-                  <motion.button
-                    onClick={handleUploadClick}
-                    className="p-2 sm:p-2.5 bg-white rounded-full shadow-lg hover:shadow-xl transition-all cursor-pointer touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    aria-label="Upload profile picture"
-                  >
-                    <Camera className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
-                  </motion.button>
+                  {/* Profile picture upload is disabled */}
 
                   {/* Shape toggle */}
                   <button
@@ -830,32 +765,6 @@ const Profile: React.FC = () => {
                     </div>
                   </div>
                 </div>
-
-                {/* Image Upload / Edit Modal */}
-                {showImageManager && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div className="absolute inset-0 bg-black/50" onClick={() => setShowImageManager(false)} />
-                    <div className="relative w-full max-w-xl mx-4">
-                      <div className="bg-white rounded-lg shadow-2xl p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <h3 className="text-lg font-semibold">Edit Profile Image</h3>
-                          <div className="flex items-center gap-2">
-                            {uploadLoading ? (
-                              <span className="text-sm text-gray-500">Uploading...</span>
-                            ) : (
-                              <button onClick={() => setShowImageManager(false)} className="text-sm text-blue-600">Close</button>
-                            )}
-                          </div>
-                        </div>
-
-                        <ImageUploadManager
-                          initialPreviewUrl={avatarPreview}
-                          onChange={handleImageChange}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 <div className="pt-6 border-t border-gray-200">
                   <div className="flex items-center justify-between">

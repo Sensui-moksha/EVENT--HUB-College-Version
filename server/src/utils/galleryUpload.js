@@ -8,7 +8,7 @@ import GalleryStorageManager from './galleryStorage.js';
  * Configures multer for gallery media uploads
  * Handles:
  * - File type validation
- * - Size limits
+ * - Size limits (increased for videos)
  * - Storage location
  * - Filename generation
  */
@@ -32,8 +32,9 @@ const galleryUpload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB max
-    files: 10 // Max 10 files per request
+    fileSize: 500 * 1024 * 1024, // 500MB max for videos
+    files: 10, // Max 10 files per request
+    fieldSize: 500 * 1024 * 1024 // 500MB field size
   }
 });
 
