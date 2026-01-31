@@ -275,7 +275,7 @@ app.use(session({
 // Session debugging middleware - log when session is created/accessed
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/gallery')) {
-    logger.production('[Session] Path:', req.path, '| SessionID:', req.sessionID, '| Has user:', !!req.session?.user);
+    logger.production('[Session] Path:', req.path, '| SessionID:', req.sessionID, '| Has user:', !!req.session?.user, '| Origin:', req.headers.origin || 'none', '| Cookie:', req.headers.cookie || 'none');
   }
   next();
 });

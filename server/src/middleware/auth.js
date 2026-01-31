@@ -9,6 +9,8 @@
  */
 export const optionalAuth = (req, res, next) => {
   if (req.session && req.session.user) {
+import logger from '../utils/logger.js';
+
     req.user = {
       id: req.session.user._id || req.session.user.id,
       userId: req.session.user._id || req.session.user.id,
@@ -38,6 +40,8 @@ export const optionalAuth = (req, res, next) => {
 export const authenticateToken = (req, res, next) => {
   // Check if user is in session (set during login)
   if (!req.session || !req.session.user) {
+    // Log details so we can inspect cookie/origin issues in production logs
+    logger.production('[Auth] Unauthorized access attempt', 'SessionID:', req.sessionID, 'HasSession:', !!req.session, 'Origin:', req.headers.origin || 'none', 'CookiePresent:', !!req.headers.cookie);
     return res.status(401).json({
       error: 'Access denied. Please log in.',
       code: 'NOT_AUTHENTICATED'
