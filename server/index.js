@@ -220,6 +220,30 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Middleware: remove problematic integrity attributes for Cloudflare Insights
+// Some CDNs or proxies may alter the script but leave an outdated SRI hash,
+// which causes the browser to block the resource. This middleware strips
+// integrity and crossorigin attributes for the known Cloudflare Insights URL
+// from HTML responses to avoid that failure.
+app.use((req, res, next) => {
+  const originalSend = res.send;
+  res.send = function (body) {
+    try {
+      const contentType = res.getHeader('Content-Type') || '';
+      if (contentType.includes('text/html') && typeof body === 'string') {
+        // Remove integrity attributes that reference static.cloudflareinsights.com
+        body = body.replace(/integrity\s*=\s*"[^"]*static\.cloudflareinsights\.com[^"]*"/ig, '');
+        // Also remove crossorigin attributes used with SRI for that script
+        body = body.replace(/crossorigin\s*=\s*"[^"]*"/ig, '');
+      }
+    } catch (e) {
+      logger.production('[SRI] Error while sanitizing HTML response:', e && e.message);
+    }
+    return originalSend.call(this, body);
+  };
+  next();
+});
+
 // Import rate limiter and error handler
 import { rateLimiter, burstProtection, getRateLimitStats } from './src/middleware/rateLimiter.js';
 import { errorHandler, notFoundHandler, getErrorStats } from './src/middleware/errorHandler.js';
@@ -262,14 +286,34 @@ app.use(session({
     ttl: 24 * 60 * 60, // 24 hours
     autoRemove: 'native'
   }),
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax', // Use lax for both dev and production to allow credentials
-    // Don't set domain - let browser handle it based on request origin
-    // domain will be set automatically to the request hostname
-  }
+  cookie: (function() {
+    // Allow overriding via env for tricky CDNs or subdomain setups
+    const cookieDomain = process.env.SESSION_COOKIE_DOMAIN || undefined; // e.g. .mictech.dpdns.org
+    const sameSiteEnv = process.env.SESSION_SAME_SITE; // 'lax'|'strict'|'none'
+    const isProd = process.env.NODE_ENV === 'production';
+
+    const cookieOpts = {
+      secure: isProd, // must be true for SameSite='none'
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    };
+
+    // Prefer explicit env, otherwise default to 'none' in production to work behind proxies/CDNs,
+    // and 'lax' in development for easier local testing.
+    cookieOpts.sameSite = sameSiteEnv || (isProd ? 'none' : 'lax');
+
+    if (cookieDomain) cookieOpts.domain = cookieDomain;
+
+    // Log effective cookie options at startup (sparse output)
+    logger.production('[Session] cookie options:', {
+      domain: cookieOpts.domain || null,
+      secure: cookieOpts.secure,
+      sameSite: cookieOpts.sameSite,
+      httpOnly: cookieOpts.httpOnly
+    });
+
+    return cookieOpts;
+  })()
 }));
 
 // Session debugging middleware - log when session is created/accessed
@@ -339,6 +383,29 @@ app.get('/api/health/status', (req, res) => {
       hasUser: !!req.session?.user,
       userEmail: req.session?.user?.email || null
     }
+  });
+});
+
+// Temporary debug endpoint to inspect session headers/state.
+// Enabled when DEBUG_SESSION=true OR when request provides a matching DEBUG_SESSION_TOKEN.
+app.get('/api/debug/session', (req, res) => {
+  const debugEnabled = process.env.DEBUG_SESSION === 'true';
+  const token = req.headers['x-debug-token'] || req.query.token;
+  const allowedToken = process.env.DEBUG_SESSION_TOKEN;
+
+  if (!debugEnabled && (!allowedToken || token !== allowedToken)) {
+    return res.status(403).json({ error: 'Debug endpoint disabled' });
+  }
+
+  // Return limited session info and request cookies/headers for debugging only
+  res.json({
+    sessionID: req.sessionID,
+    hasSession: !!req.session,
+    hasUser: !!req.session?.user,
+    user: req.session?.user ? { id: req.session.user._id || req.session.user.id, email: req.session.user.email, role: req.session.user.role } : null,
+    requestCookieHeader: req.headers.cookie || null,
+    origin: req.headers.origin || null,
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -3774,6 +3841,13 @@ app.post('/api/login', async (req, res) => {
       logger.production('[Login] Session saved successfully. SessionID:', req.sessionID, 'Email:', userObj.email);
       // Expose session ID in header for debugging (safe to remove later)
       res.setHeader('X-Session-ID', req.sessionID);
+      // Log the Set-Cookie header the server will send (helps confirm cookie emitted)
+      try {
+        const sc = res.getHeader('Set-Cookie');
+        logger.production('[Login] Response Set-Cookie header:', sc);
+      } catch (e) {
+        logger.production('[Login] Unable to read Set-Cookie header:', e && e.message);
+      }
       // Session-based authentication (no JWT tokens)
       res.json({ message: 'Login successful', user: userObj });
     });
