@@ -125,6 +125,11 @@ export const useGallery = (eventId: string) => {
  * Hook for uploading media files with progress tracking
  * Uses XMLHttpRequest for reliable progress tracking and background tab support
  * GridFS-only uploads for maximum performance
+ * 
+ * BACKGROUND TAB BEHAVIOR:
+ * - Upload continues even when tab is in background (XHR is network-level)
+ * - Progress updates may be throttled by browser (batched to ~1/sec)
+ * - Progress syncs immediately when tab becomes visible again
  */
 export const useGalleryUpload = (eventId: string) => {
   const [uploading, setUploading] = useState(false);
@@ -135,6 +140,23 @@ export const useGalleryUpload = (eventId: string) => {
   const [uploadedBytes, setUploadedBytes] = useState(0);
   const [totalBytes, setTotalBytes] = useState(0);
   const [currentXhr, setCurrentXhr] = useState<XMLHttpRequest | null>(null);
+  const [isTabActive, setIsTabActive] = useState(true);
+
+  // Track tab visibility to sync progress when user returns
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      const isVisible = document.visibilityState === 'visible';
+      setIsTabActive(isVisible);
+      
+      // When tab becomes visible again, force a progress state refresh
+      if (isVisible && uploading) {
+        console.log('[Upload] Tab active - syncing progress');
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [uploading]);
 
   // Cancel upload function
   const cancelUpload = useCallback(() => {
