@@ -245,14 +245,29 @@ const CreateSubEvent: React.FC = () => {
       setLocalImageFile(undefined);
       setLocalImagePreview(undefined);
       setLocalImageMeta({});
+      // Also clear URL image since user deleted
+      setFormData(prev => ({ ...prev, image: '' }));
       return;
     }
     if (payload.mode === 'upload' && payload.file) {
+      // Uploading a new file (cropped, edited, or from external URL)
       setLocalImageDeleted(false);
       setLocalImageFile(payload.file);
       setLocalImagePreview(payload.previewUrl);
       setLocalImageMeta({ width: payload.width, height: payload.height, originalName: payload.originalName });
+      // Clear URL image since we're uploading
+      setFormData(prev => ({ ...prev, image: '' }));
+    } else if (payload.mode === 'none' && payload.previewUrl) {
+      // Using existing database image URL (no re-upload needed!)
+      // This prevents duplicate storage - just reference the existing image
+      setLocalImageDeleted(false);
+      setLocalImageFile(undefined); // No file to upload
+      setLocalImagePreview(payload.previewUrl);
+      setLocalImageMeta({ width: payload.width, height: payload.height });
+      // Store the database image URL directly in form data
+      setFormData(prev => ({ ...prev, image: payload.previewUrl || '' }));
     } else if (payload.mode === 'none') {
+      // Cleared / reset
       setLocalImageFile(undefined);
       setLocalImagePreview(undefined);
       setLocalImageMeta({});

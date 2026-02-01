@@ -1492,7 +1492,15 @@ export const uploadChunk = async (req, res) => {
       fs.writeFileSync(chunkPath, chunkData);
     } catch (err) {
       logger.production(`[Chunked] Failed to write chunk to disk: ${err.message}`);
-      return res.status(500).json({ error: 'Failed to save chunk' });
+      // Cleanup on disk write failure - the upload is unusable
+      try {
+        if (upload.uploadDir && fs.existsSync(upload.uploadDir)) {
+          fs.rmSync(upload.uploadDir, { recursive: true, force: true });
+        }
+        chunkedUploads.delete(uploadId);
+        logger.production(`[Chunked] Cleaned up failed upload ${uploadId} due to disk write error`);
+      } catch { /* ignore cleanup error */ }
+      return res.status(500).json({ error: 'Failed to save chunk - storage full or unavailable', retryable: false });
     }
     
     // Track which chunks we've received
@@ -1509,7 +1517,18 @@ export const uploadChunk = async (req, res) => {
     });
   } catch (error) {
     logger.production('Error uploading chunk:', error.message);
-    res.status(500).json({ error: 'Failed to upload chunk' });
+    // Cleanup on unexpected error
+    const upload = chunkedUploads.get(uploadId);
+    if (upload) {
+      try {
+        if (upload.uploadDir && fs.existsSync(upload.uploadDir)) {
+          fs.rmSync(upload.uploadDir, { recursive: true, force: true });
+        }
+        chunkedUploads.delete(uploadId);
+        logger.production(`[Chunked] Cleaned up failed upload ${uploadId} due to error: ${error.message}`);
+      } catch { /* ignore cleanup error */ }
+    }
+    res.status(500).json({ error: 'Failed to upload chunk', retryable: true });
   }
 };
 
@@ -1616,6 +1635,14 @@ export const completeChunkedUpload = async (req, res) => {
       logger.production(`[Chunked] GridFS upload complete for ${uploadId}: ${(totalBytesWritten / 1024 / 1024).toFixed(2)}MB`);
     } catch (gridfsError) {
       logger.production(`[Chunked] GridFS error for ${uploadId}: ${gridfsError.message}`);
+      // IMPORTANT: Clean up temp files on GridFS failure to save storage
+      try {
+        if (upload.uploadDir && fs.existsSync(upload.uploadDir)) {
+          fs.rmSync(upload.uploadDir, { recursive: true, force: true });
+          logger.production(`[Chunked] Cleaned up temp files after GridFS error for ${uploadId}`);
+        }
+        chunkedUploads.delete(uploadId);
+      } catch { /* ignore cleanup error */ }
       return res.status(500).json({ 
         error: `Failed to save file to storage: ${gridfsError.message}`,
         retryable: true 

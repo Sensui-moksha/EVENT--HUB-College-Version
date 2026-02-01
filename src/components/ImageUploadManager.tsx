@@ -267,14 +267,39 @@ const ImageUploadManager: React.FC<Props> = ({
   const handleBrowserSelectImage = (imageUrl: string, width?: number, height?: number) => {
     setPreviewUrl(imageUrl);
     setDimensions({ width, height });
-    // Use full URL for fetching to handle relative paths
+    
+    // For database images (GridFS), just use the URL reference - NO re-upload needed!
+    // This prevents duplicates: the image already exists in the database
+    if (imageUrl.includes('/api/images/')) {
+      // Clear file to indicate we're using a database reference, not uploading
+      setFile(undefined);
+      // Pass the database URL directly - the event will store this URL reference
+      onChange({ 
+        mode: 'none', // Not uploading a new file
+        previewUrl: imageUrl, 
+        width, 
+        height,
+        originalName: undefined,
+        // Special flag to indicate using existing database image
+        file: undefined,
+        blob: undefined
+      });
+      setShowImageBrowser(false);
+      return;
+    }
+    
+    // For external URLs, fetch and prepare for upload (keeping original format)
     const fullUrl = getFullImageUrl(imageUrl);
     fetch(fullUrl)
       .then(res => res.blob())
       .then(blob => {
-        const selectedFile = new File([blob], 'selected_image.webp', { type: blob.type || 'image/webp' });
+        // Extract filename from URL or use default, keeping original extension
+        const urlPath = imageUrl.split('/').pop() || 'image';
+        const extension = urlPath.includes('.') ? urlPath.split('.').pop() : 'jpg';
+        const fileName = `selected_image.${extension}`;
+        const selectedFile = new File([blob], fileName, { type: blob.type || `image/${extension}` });
         setFile(selectedFile);
-        onChange({ mode: 'upload', file: selectedFile, blob, previewUrl: imageUrl, width, height, originalName: 'selected_image.webp' });
+        onChange({ mode: 'upload', file: selectedFile, blob, previewUrl: imageUrl, width, height, originalName: fileName });
       })
       .catch(err => {
         console.error('Failed to fetch selected image:', err);

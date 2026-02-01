@@ -5432,7 +5432,7 @@ app.delete('/api/events/:id/image', async (req, res) => {
   }
 });
 
-// Stream image content by GridFS ID (top-level route)
+// Stream image content by GridFS ID (top-level route) with CACHING
 app.get('/api/images/:id', async (req, res) => {
   if (!gridFsBucket) return res.status(503).json({ error: 'Image storage not ready' });
   let fileId;
@@ -5445,9 +5445,33 @@ app.get('/api/images/:id', async (req, res) => {
     const files = await gridFsBucket.find({ _id: fileId }).toArray();
     if (!files || !files[0]) return res.status(404).json({ error: 'Image not found' });
     const file = files[0];
+    
+    // Generate ETag based on file ID and size for cache validation
+    const etag = `"${fileId}-${file.length}"`;
+    
+    // Check for conditional request (304 Not Modified)
+    const ifNoneMatch = req.headers['if-none-match'];
+    if (ifNoneMatch === etag) {
+      res.status(304);
+      res.set('ETag', etag);
+      res.set('Cache-Control', 'public, max-age=604800, immutable');
+      return res.end();
+    }
+    
+    // Set content type
     if (file.contentType) res.set('Content-Type', file.contentType);
     else if (file.metadata?.mimeType) res.set('Content-Type', file.metadata.mimeType);
     else res.set('Content-Type', 'application/octet-stream');
+    
+    // Set aggressive caching headers for fast loading
+    res.set('ETag', etag);
+    res.set('Cache-Control', 'public, max-age=604800, immutable'); // 7 days, immutable
+    res.set('Vary', 'Accept-Encoding');
+    res.set('X-Content-Type-Options', 'nosniff');
+    
+    // Set Content-Length for proper progress indication
+    if (file.length) res.set('Content-Length', file.length.toString());
+    
     const stream = gridFsBucket.openDownloadStream(fileId);
     stream.on('error', (err) => {
       console.error('GridFS stream error:', err.message);
