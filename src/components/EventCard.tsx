@@ -114,6 +114,22 @@ const EventCard: React.FC<EventCardProps> = ({ event }) => {
   const ac: any = (event as any)?.accessControl || { type: 'everyone' };
   const isRestricted = !!ac?.type && ac.type !== 'everyone';
   const isPrivileged = user?.role === 'admin' || user?.role === 'organizer' || userId === (event as any)?.organizerId;
+  
+  // Check if user can register for this event
+  const canUserRegister = (() => {
+    if (!isRestricted) return true;
+    if (!user) return false;
+    if (ac.type === 'students_only') return user.role === 'student';
+    if (ac.type === 'faculty_only') return user.role === 'faculty';
+    if (ac.type === 'custom') {
+      if (Array.isArray(ac.allowedRoles) && ac.allowedRoles.length > 0 && !ac.allowedRoles.includes(user.role)) return false;
+      if (Array.isArray(ac.allowedDepartments) && ac.allowedDepartments.length > 0 && user.department && !ac.allowedDepartments.includes(user.department)) return false;
+      if (user.role === 'student' && Array.isArray(ac.allowedYears) && ac.allowedYears.length > 0 && user.year && !ac.allowedYears.includes(user.year)) return false;
+      return true;
+    }
+    return true;
+  })();
+
   const buildRequirementText = (acObj: any) => {
     if (!acObj?.type || acObj.type === 'everyone') return 'Open to everyone';
     if (acObj.type === 'students_only') return 'Students only';
@@ -201,6 +217,15 @@ const EventCard: React.FC<EventCardProps> = ({ event }) => {
                 title={buildRequirementText(ac)}
               >
                 <Lock className="w-3 h-3" /> Restricted
+              </span>
+            )}
+            {/* Show restricted badge for non-privileged users who can't register */}
+            {!isPrivileged && isRestricted && !canUserRegister && (
+              <span
+                className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold bg-orange-100 text-orange-700 border border-orange-200"
+                title={`Registration restricted: ${buildRequirementText(ac)}`}
+              >
+                <Lock className="w-3 h-3" /> {buildRequirementText(ac)}
               </span>
             )}
             {subEventCountLoading && (

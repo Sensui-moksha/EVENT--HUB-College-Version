@@ -1880,30 +1880,30 @@ const SubEventDetails: React.FC = () => {
                               Reg. ID
                             </th>
                           )}
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                          <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                             Name
                           </th>
                           {(user?.role === 'admin' || user?.role === 'organizer') && (
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                            <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                               Email
                             </th>
                           )}
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                            Department
+                          <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            Dept
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                            Section/Room
+                          <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            Sec/Room
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                          <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                             Year
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                          <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                             Registered At
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                          <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                             Source
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                          <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                             Actions
                           </th>
                         </tr>
@@ -1920,45 +1920,45 @@ const SubEventDetails: React.FC = () => {
                               transition={{ duration: 0.6, ease: "easeOut" }}
                             >
                               {(user?.role === 'admin' || user?.role === 'organizer') && (
-                                <td className="px-4 py-4">
+                                <td className="px-2 py-3">
                                   <div className="text-xs font-mono text-gray-900 break-all">
                                     {registration.registrationId}
                                   </div>
                                 </td>
                               )}
-                              <td className="px-4 py-4">
-                                <div className="text-sm font-medium text-gray-900">
+                              <td className="px-2 py-3">
+                                <div className="text-xs font-medium text-gray-900">
                                   {userInfo?.name || 'N/A'}
                                 </div>
                               </td>
                               {(user?.role === 'admin' || user?.role === 'organizer') && (
-                                <td className="px-4 py-4">
-                                  <div className="text-sm text-gray-600 break-all">
+                                <td className="px-2 py-3">
+                                  <div className="text-xs text-gray-600 break-words">
                                     {userInfo?.email || 'N/A'}
                                   </div>
                                 </td>
                               )}
-                              <td className="px-4 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-600">
+                              <td className="px-2 py-3">
+                                <div className="text-xs text-gray-600">
                                   {userInfo?.department || 'N/A'}
                                 </div>
                               </td>
-                              <td className="px-4 py-4 text-center">
-                                <div className="text-sm text-gray-600">
+                              <td className="px-2 py-3 text-center">
+                                <div className="text-xs text-gray-600">
                                   {userInfo?.section || userInfo?.roomNo || 'N/A'}
                                 </div>
                               </td>
-                              <td className="px-4 py-4 text-center">
-                                <div className="text-sm text-gray-600">
+                              <td className="px-2 py-3 text-center">
+                                <div className="text-xs text-gray-600">
                                   {userInfo?.year || 'N/A'}
                                 </div>
                               </td>
-                              <td className="px-4 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-600">
+                              <td className="px-2 py-3">
+                                <div className="text-xs text-gray-600">
                                   {new Date(registration.registeredAt).toLocaleDateString()} {new Date(registration.registeredAt).toLocaleTimeString()}
                                 </div>
                               </td>
-                              <td className="px-4 py-4 whitespace-nowrap">
+                              <td className="px-2 py-3">
                                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                                   (registration as any).source === 'waitlist' 
                                     ? 'bg-purple-100 text-purple-800' 
@@ -1967,7 +1967,7 @@ const SubEventDetails: React.FC = () => {
                                   {(registration as any).source === 'waitlist' ? 'Waitlist' : 'Direct'}
                                 </span>
                               </td>
-                              <td className="px-4 py-4 whitespace-nowrap">
+                              <td className="px-2 py-3">
                                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                                   registration.status === 'attended' 
                                     ? 'bg-green-100 text-green-800' 

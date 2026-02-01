@@ -64,12 +64,16 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     if (userId) {
       fetchNotifications();
 
-      // Connect to the socket on the backend server
+      // Connect to the socket on the backend server with enhanced reconnection settings
       const newSocket = io(getSocketUrl(), {
         reconnection: true,
         reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        reconnectionAttempts: 5
+        reconnectionDelayMax: 10000,
+        reconnectionAttempts: Infinity, // Keep trying to reconnect
+        timeout: 20000, // Connection timeout
+        transports: ['websocket', 'polling'], // Try websocket first, fallback to polling
+        forceNew: false,
+        autoConnect: true
       });
 
       socketRef.current = newSocket;

@@ -540,11 +540,11 @@ const Dashboard: React.FC = () => {
                                     <thead>
                                       <tr className="bg-gray-100">
                                         <th className="px-2 sm:px-4 py-2 text-left whitespace-nowrap">Name</th>
-                                        <th className="px-2 sm:px-4 py-2 text-left whitespace-nowrap hidden sm:table-cell">{`Section/Room`}</th>
+                                        <th className="px-2 sm:px-4 py-2 text-left whitespace-nowrap hidden sm:table-cell">Sec/Room</th>
                                         <th className="px-2 sm:px-4 py-2 text-left whitespace-nowrap">Dept</th>
                                         <th className="px-2 sm:px-4 py-2 text-left whitespace-nowrap hidden md:table-cell">Mobile</th>
                                         {(user?.role === 'admin' || user?.role === 'organizer') && (
-                                          <th className="px-2 sm:px-4 py-2 text-left whitespace-nowrap hidden lg:table-cell">Email</th>
+                                          <th className="px-2 sm:px-4 py-2 text-left">Email</th>
                                         )}
                                       </tr>
                                     </thead>
@@ -561,7 +561,7 @@ const Dashboard: React.FC = () => {
                                             <td className="px-2 sm:px-4 py-2">{reg.user.department || '-'}</td>
                                             <td className="px-2 sm:px-4 py-2 hidden md:table-cell">{reg.user.mobile || '-'}</td>
                                             {(user?.role === 'admin' || user?.role === 'organizer') && (
-                                              <td className="px-2 sm:px-4 py-2 truncate max-w-[150px] hidden lg:table-cell">{reg.user.email}</td>
+                                              <td className="px-2 sm:px-4 py-2 break-words text-xs">{reg.user.email}</td>
                                             )}
                                           </tr>
                                         ));

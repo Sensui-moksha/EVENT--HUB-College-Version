@@ -37,6 +37,7 @@ import {
   Search,
   Bell,
   AlertCircle,
+  AlertTriangle,
   Images,
   UserPlus,
   Crown,
@@ -1213,43 +1214,9 @@ const EventDetails: React.FC = () => {
   };
 
 
-  // Restrict entire page when user isn't eligible and not privileged
+  // Access control - everyone can VIEW, but only eligible users can REGISTER
+  // No page blocking - just show registration restrictions
   const ac = event?.accessControl || { type: 'everyone' as const };
-  if (!isPrivileged && !hasAccess) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="max-w-xl text-center bg-white rounded-2xl shadow p-6 border border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Restricted Event</h2>
-          <p className="text-gray-700 mb-4">You don't have permission to view this event.</p>
-          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-4 mb-4 text-sm">
-            <p className="font-semibold mb-1">Access requirements</p>
-            <p>{buildRequirementText(ac)}</p>
-            {failingReasons.length > 0 && (
-              <ul className="list-disc list-inside mt-2 text-yellow-900 text-sm text-left">
-                {failingReasons.map((r, i) => (<li key={i}>{r}</li>))}
-              </ul>
-            )}
-          </div>
-          <div className="flex gap-3 justify-center">
-            {!user && (
-              <button
-                onClick={() => navigate('/login')}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                Login to View
-              </button>
-            )}
-            <button
-              onClick={() => navigate('/events')}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Back to Events
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Fetch sub-event count before showing confirmation
   const openCompleteConfirmation = async () => {
@@ -2109,6 +2076,37 @@ const EventDetails: React.FC = () => {
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-3 sm:gap-4">
+              {/* Registration Restricted Notice - shown when user can view but cannot register */}
+              {!hasAccess && !isRegistered && ac.type !== 'everyone' && (
+                <div className="p-4 bg-orange-50 border-2 border-orange-300 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-6 h-6 text-orange-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-orange-900 mb-1">Registration Restricted</h4>
+                      <p className="text-sm text-orange-800 mb-2">
+                        You can view this event but cannot register due to access restrictions.
+                      </p>
+                      <div className="bg-orange-100 rounded p-2 text-sm">
+                        <p className="font-medium text-orange-900 mb-1">Requirements: {buildRequirementText(ac)}</p>
+                        {failingReasons.length > 0 && (
+                          <ul className="list-disc list-inside text-orange-800 text-xs mt-1">
+                            {failingReasons.map((r, i) => (<li key={i}>{r}</li>))}
+                          </ul>
+                        )}
+                      </div>
+                      {!user && (
+                        <button
+                          onClick={() => navigate('/login')}
+                          className="mt-3 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium"
+                        >
+                          Login to Check Eligibility
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {user ? (
                 <>
                   {isRegistered ? (
@@ -3314,45 +3312,45 @@ const EventDetails: React.FC = () => {
               <table className="min-w-full bg-white border border-gray-200 rounded-lg table-fixed">
                 <colgroup>
                   {(user?.role === 'admin' || user?.role === 'organizer') && (
-                    <col className="w-32" />
+                    <col className="w-24" />
                   )}
-                  <col className="w-48" />
+                  <col className="w-36" />
                   {(user?.role === 'admin' || user?.role === 'organizer') && (
-                    <col className="w-64" />
+                    <col className="w-56" />
                   )}
-                  <col className="w-32" />
-                  <col className="w-28" />
                   <col className="w-20" />
-                  <col className="w-40" />
+                  <col className="w-20" />
+                  <col className="w-16" />
+                  <col className="w-48" />
                   {event.isTeamEvent && (
-                    <col className="w-40" />
+                    <col className="w-36" />
                   )}
-                  <col className="w-32" />
-                  <col className="w-40" />
+                  <col className="w-28" />
+                  <col className="w-36" />
                   {(user?.role === 'admin' || user?.role === 'organizer') && (
-                    <col className="w-28" />
+                    <col className="w-24" />
                   )}
                 </colgroup>
                 <thead>
                   <tr>
                     {(user?.role === 'admin' || user?.role === 'organizer') && (
-                      <th className="px-4 py-3 border-b text-left text-sm font-semibold text-gray-700 whitespace-nowrap">Reg. ID</th>
+                      <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Reg. ID</th>
                     )}
-                    <th className="px-4 py-3 border-b text-left text-sm font-semibold text-gray-700 whitespace-nowrap">Name</th>
+                    <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Name</th>
                     {(user?.role === 'admin' || user?.role === 'organizer') && (
-                      <th className="px-4 py-3 border-b text-left text-sm font-semibold text-gray-700 whitespace-nowrap">Email</th>
+                      <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Email</th>
                     )}
-                    <th className="px-4 py-3 border-b text-left text-sm font-semibold text-gray-700 whitespace-nowrap">Department</th>
-                    <th className="px-4 py-3 border-b text-left text-sm font-semibold text-gray-700 whitespace-nowrap">Section/Room</th>
-                    <th className="px-4 py-3 border-b text-left text-sm font-semibold text-gray-700 whitespace-nowrap">Year</th>
-                    <th className="px-4 py-3 border-b text-left text-sm font-semibold text-gray-700 whitespace-nowrap">College</th>
+                    <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Dept</th>
+                    <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Sec/Room</th>
+                    <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Year</th>
+                    <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">College</th>
                     {event.isTeamEvent && (
-                      <th className="px-4 py-3 border-b text-left text-sm font-semibold text-gray-700 whitespace-nowrap">Team</th>
+                      <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Team</th>
                     )}
-                    <th className="px-4 py-3 border-b text-left text-sm font-semibold text-gray-700 whitespace-nowrap">Registered At</th>
-                    <th className="px-4 py-3 border-b text-left text-sm font-semibold text-gray-700 whitespace-nowrap">Approval Type</th>
+                    <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Registered At</th>
+                    <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Approval Type</th>
                     {(user?.role === 'admin' || user?.role === 'organizer') && (
-                      <th className="px-4 py-3 border-b text-left text-sm font-semibold text-gray-700 whitespace-nowrap">Actions</th>
+                      <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Actions</th>
                     )}
                   </tr>
                 </thead>
@@ -3366,9 +3364,9 @@ const EventDetails: React.FC = () => {
                       transition={{ duration: 0.6, ease: "easeOut" }}
                     >
                       {(user?.role === 'admin' || user?.role === 'organizer') && (
-                        <td className="px-4 py-3 text-sm text-gray-800 whitespace-nowrap">{reg.user?.regId ?? reg.id}</td>
+                        <td className="px-2 py-3 text-xs text-gray-800">{reg.user?.regId ?? reg.id}</td>
                       )}
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-2 py-3 text-xs">
                         {reg.user?._id || reg.user?.id ? (
                           <Link 
                             to={`/user/${reg.user._id || reg.user.id}`}
@@ -3381,14 +3379,14 @@ const EventDetails: React.FC = () => {
                         )}
                       </td>
                       {(user?.role === 'admin' || user?.role === 'organizer') && (
-                        <td className="px-4 py-3 text-sm text-gray-800 break-all">{reg.user?.email ?? '-'}</td>
+                        <td className="px-2 py-3 text-xs text-gray-800 break-words">{reg.user?.email ?? '-'}</td>
                       )}
-                      <td className="px-4 py-3 text-sm text-gray-800 whitespace-nowrap">{reg.user?.department ?? '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-800 text-center">{reg.user?.role === 'faculty' ? reg.user?.roomNo ?? '-' : reg.user?.section ?? '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-800 text-center">{reg.user?.year ?? '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-800 whitespace-nowrap">{reg.user?.college ?? '-'}</td>
+                      <td className="px-2 py-3 text-xs text-gray-800">{reg.user?.department ?? '-'}</td>
+                      <td className="px-2 py-3 text-xs text-gray-800 text-center">{reg.user?.role === 'faculty' ? reg.user?.roomNo ?? '-' : reg.user?.section ?? '-'}</td>
+                      <td className="px-2 py-3 text-xs text-gray-800 text-center">{reg.user?.year ?? '-'}</td>
+                      <td className="px-2 py-3 text-xs text-gray-800 leading-tight">{reg.user?.college ?? '-'}</td>
                       {event.isTeamEvent && (
-                        <td className="px-4 py-3 text-sm">
+                        <td className="px-2 py-3 text-xs">
                           {(() => {
                             const userId = reg.user?._id || reg.user?.id;
                             const teamInfo = userId ? userTeamMap[userId] : null;
@@ -3396,11 +3394,11 @@ const EventDetails: React.FC = () => {
                             if (teamInfo) {
                               return (
                                 <div className="flex flex-col gap-0.5">
-                                  <span className="font-medium text-purple-700">{teamInfo.teamName}</span>
-                                  <span className="text-xs text-gray-500 flex items-center gap-1">
+                                  <span className="font-medium text-purple-700 text-xs">{teamInfo.teamName}</span>
+                                  <span className="text-[10px] text-gray-500 flex items-center gap-1">
                                     {teamInfo.role === 'leader' ? (
                                       <span className="inline-flex items-center gap-0.5 text-yellow-600">
-                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                        <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
                                           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                                         </svg>
                                         Leader
@@ -3415,40 +3413,40 @@ const EventDetails: React.FC = () => {
                                 </div>
                               );
                             }
-                            return <span className="text-gray-400 italic">No team</span>;
+                            return <span className="text-gray-400 italic text-[10px]">No team</span>;
                           })()}
                         </td>
                       )}
-                      <td className="px-4 py-3 text-sm text-gray-800 whitespace-nowrap">{reg.registeredAt ? format(new Date(reg.registeredAt), 'MMM dd, yyyy') : '-'}</td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-2 py-3 text-xs text-gray-800">{reg.registeredAt ? format(new Date(reg.registeredAt), 'MMM dd, yyyy') : '-'}</td>
+                      <td className="px-2 py-3 text-xs">
                         {reg.approvalType === 'autoApproved' && (
-                          <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Auto Approved
+                          <span className="inline-flex items-center px-1.5 py-0.5 bg-green-100 text-green-800 text-[10px] font-medium rounded-full">
+                            <CheckCircle className="w-2.5 h-2.5 mr-0.5" />
+                            Auto
                           </span>
                         )}
                         {reg.approvalType === 'manualApproved' && (
-                          <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Manually Approved
+                          <span className="inline-flex items-center px-1.5 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-medium rounded-full">
+                            <CheckCircle className="w-2.5 h-2.5 mr-0.5" />
+                            Manual
                           </span>
                         )}
                         {reg.approvalType === 'waitingListApproval' && (
-                          <span className="inline-flex items-center px-2 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded-full">
-                            <Clock className="w-3 h-3 mr-1" />
-                            Waiting List Approval
+                          <span className="inline-flex items-center px-1.5 py-0.5 bg-orange-100 text-orange-800 text-[10px] font-medium rounded-full">
+                            <Clock className="w-2.5 h-2.5 mr-0.5" />
+                            Waitlist
                           </span>
                         )}
                       </td>
                       {(user?.role === 'admin' || user?.role === 'organizer') && (
-                        <td className="px-4 py-3 text-sm">
+                        <td className="px-2 py-3 text-xs">
                           <button
                             onClick={() => handleRemoveParticipant(
                               reg.user?._id || reg.user?.id || reg.userId, 
                               reg.user?.name || 'Unknown User'
                             )}
                             disabled={loading}
-                            className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center space-x-1 whitespace-nowrap"
+                            className="px-2 py-1 bg-red-600 text-white text-[10px] rounded hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center space-x-1"
                             title="Remove participant"
                           >
                             <Trash2 className="w-3 h-3" />

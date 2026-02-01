@@ -276,18 +276,48 @@ export const useGalleryUpload = (eventId: string) => {
           }
         }
         
-        // 3. Complete upload
+        // 3. Complete upload with retry logic for network resilience
         setUploadStatus('Assembling file...');
-        const completeResponse = await apiRequest(
-          `/api/gallery/${eventId}/upload-chunk/${uploadId}/complete`,
-          { method: 'POST' }
-        );
+        let completeRetries = 5;
+        let completeError: Error | null = null;
+        let completeResponse: { success: boolean; error?: string; media?: GalleryMedia } | null = null;
         
-        if (!completeResponse.success) {
-          throw new Error(completeResponse.error || 'Failed to complete upload');
+        while (completeRetries > 0) {
+          try {
+            completeResponse = await apiRequest(
+              `/api/gallery/${eventId}/upload-chunk/${uploadId}/complete`,
+              { method: 'POST' }
+            );
+            
+            if (completeResponse.success) {
+              break; // Success!
+            }
+            
+            completeError = new Error(completeResponse.error || 'Failed to complete upload');
+            completeRetries--;
+            
+            if (completeRetries > 0) {
+              console.log(`[Chunked] Complete request failed, retrying... (${completeRetries} attempts left)`);
+              setUploadStatus(`Assembling file... (retry ${5 - completeRetries}/5)`);
+              await new Promise(r => setTimeout(r, 2000)); // Wait 2s before retry
+            }
+          } catch (err) {
+            completeError = err instanceof Error ? err : new Error(String(err));
+            completeRetries--;
+            
+            if (completeRetries > 0) {
+              console.log(`[Chunked] Complete request error, retrying... (${completeRetries} attempts left):`, completeError.message);
+              setUploadStatus(`Assembling file... (retry ${5 - completeRetries}/5)`);
+              await new Promise(r => setTimeout(r, 2000)); // Wait 2s before retry
+            }
+          }
         }
         
-        return completeResponse.media;
+        if (!completeResponse?.success) {
+          throw completeError || new Error('Failed to complete upload after all retries');
+        }
+        
+        return completeResponse.media as GalleryMedia;
       } catch (err) {
         // Cancel the chunked upload on error
         try {

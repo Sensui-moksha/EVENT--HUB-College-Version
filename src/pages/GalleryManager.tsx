@@ -75,6 +75,8 @@ export const GalleryManager: React.FC = () => {
   if (error) {
     // Check if it's an authentication error
     const isAuthError = error.includes('Access denied') || error.includes('log in') || error.includes('Unauthorized');
+    // Check if it's a network error
+    const isNetworkError = error.includes('Failed to fetch') || error.includes('Unable to connect') || error.includes('Network connection') || error.includes('internet');
     
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -92,6 +94,17 @@ export const GalleryManager: React.FC = () => {
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Go to Login
+              </button>
+            </div>
+          )}
+          {isNetworkError && (
+            <div className="space-y-3">
+              <p className="text-gray-600 text-sm">Please check your internet connection and try again.</p>
+              <button
+                onClick={() => refetch()}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Retry
               </button>
             </div>
           )}

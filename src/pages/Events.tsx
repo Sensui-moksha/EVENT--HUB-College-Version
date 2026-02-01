@@ -37,14 +37,19 @@ const Events: React.FC = () => {
     { value: 'completed', label: 'Completed' },
   ];
 
-  const canUserSeeEvent = (event: any) => {
-    // Admins/organizers see everything
-    if (user?.role === 'admin' || user?.role === 'organizer' || userId === (event as any)?.organizerId) {
-      return true;
-    }
+  // Everyone can VIEW all events - access control only restricts REGISTRATION
+  // This function is kept for backwards compatibility but now always returns true
+  const canUserSeeEvent = (_event: any) => {
+    // All events are visible to everyone
+    // Registration restrictions are shown on the event details page
+    return true;
+  };
+
+  // Check if user can register for an event (used for showing badges)
+  const canUserRegisterForEvent = (event: any) => {
     const ac = (event as any)?.accessControl || { type: 'everyone' };
     if (!ac?.type || ac.type === 'everyone') return true;
-    if (!user) return false; // guests can only see 'everyone'
+    if (!user) return false; // guests cannot register for restricted events
     if (ac.type === 'students_only') return user.role === 'student';
     if (ac.type === 'faculty_only') return user.role === 'faculty';
     if (ac.type === 'custom') {

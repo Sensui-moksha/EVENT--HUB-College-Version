@@ -348,6 +348,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
           <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
             <h2 className="text-lg font-semibold text-gray-900">Select Image</h2>
             <button
+              type="button"
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               title="Close"
@@ -359,6 +360,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
           {/* Tabs */}
           <div className="flex border-b flex-shrink-0">
             <button
+              type="button"
               onClick={() => setActiveTab('database')}
               className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium transition-colors ${
                 activeTab === 'database'
@@ -370,6 +372,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
               Database Images
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('upload')}
               className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium transition-colors ${
                 activeTab === 'upload'
@@ -401,6 +404,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                     </div>
                     {/* Add Button */}
                     <button
+                      type="button"
                       onClick={triggerQuickAdd}
                       disabled={deleteMode}
                       className={`px-3 py-2 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors ${
@@ -416,6 +420,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                     {/* Delete Button - transforms based on mode */}
                     {!deleteMode ? (
                       <button
+                        type="button"
                         onClick={toggleDeleteMode}
                         className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-1.5 whitespace-nowrap transition-colors"
                         title="Select images to delete"
@@ -426,6 +431,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                     ) : (
                       <div className="flex items-center gap-2">
                         <button
+                          type="button"
                           onClick={toggleDeleteMode}
                           className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 flex items-center gap-1.5 whitespace-nowrap transition-colors"
                           title="Cancel delete mode"
@@ -434,6 +440,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                           <span className="hidden sm:inline">Cancel</span>
                         </button>
                         <button
+                          type="button"
                           onClick={() => selectedForDelete.size > 0 && setShowMultiDeleteConfirm(true)}
                           disabled={selectedForDelete.size === 0}
                           className={`px-3 py-2 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-all ${
@@ -459,6 +466,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                     <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
                       <span className="text-sm text-gray-600">Quick select:</span>
                       <button
+                        type="button"
                         onClick={selectAllForDelete}
                         className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
                       >
@@ -466,6 +474,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                       </button>
                       <span className="text-gray-300">|</span>
                       <button
+                        type="button"
                         onClick={clearDeleteSelection}
                         className="text-sm text-gray-600 hover:text-gray-800 hover:underline"
                       >
@@ -494,6 +503,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                       <ImageIcon className="w-12 h-12 mb-3 opacity-50" />
                       <p>No images found</p>
                       <button
+                        type="button"
                         onClick={triggerQuickAdd}
                         className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                       >
@@ -598,6 +608,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                         </p>
                       </div>
                       <button
+                        type="button"
                         onClick={handleConfirmSelection}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
                       >
@@ -630,6 +641,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                     </p>
                     <div className="flex flex-col sm:flex-row gap-3 justify-center">
                       <button
+                        type="button"
                         onClick={() => fileInputRef.current?.click()}
                         className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium inline-flex items-center justify-center gap-2"
                       >
@@ -637,6 +649,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                         Save to Database
                       </button>
                       <button
+                        type="button"
                         onClick={handleUploadNew}
                         className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium inline-flex items-center justify-center gap-2"
                       >
@@ -683,6 +696,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                     
                     <div className="flex gap-3">
                       <button
+                        type="button"
                         onClick={cancelUpload}
                         disabled={uploading}
                         className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium disabled:opacity-50"
@@ -690,6 +704,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                         Cancel
                       </button>
                       <button
+                        type="button"
                         onClick={handleDirectUpload}
                         disabled={uploading || !uploadFileName.trim()}
                         className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 inline-flex items-center justify-center gap-2"
@@ -747,6 +762,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                   </div>
                   <div className="flex gap-3">
                     <button
+                      type="button"
                       onClick={() => setShowDeleteConfirm(null)}
                       disabled={deleting === showDeleteConfirm.id}
                       className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium disabled:opacity-50"
@@ -754,6 +770,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                       Cancel
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleDeleteImage(showDeleteConfirm)}
                       disabled={deleting === showDeleteConfirm.id}
                       className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium disabled:opacity-50 inline-flex items-center justify-center gap-2"
@@ -830,6 +847,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                   
                   <div className="flex gap-3">
                     <button
+                      type="button"
                       onClick={() => setShowMultiDeleteConfirm(false)}
                       disabled={deleting === 'multi'}
                       className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium disabled:opacity-50"
@@ -837,6 +855,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
                       Cancel
                     </button>
                     <button
+                      type="button"
                       onClick={handleMultiDelete}
                       disabled={deleting === 'multi'}
                       className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium disabled:opacity-50 inline-flex items-center justify-center gap-2"
