@@ -1,8 +1,9 @@
 import React from 'react';
-import { Upload, X, CloudUpload, Loader2 } from 'lucide-react';
+import { Upload, X, CloudUpload, Loader2, XCircle } from 'lucide-react';
 
 interface MediaUploaderProps {
   onFilesSelected: (files: File[]) => void;
+  onCancelUpload?: () => void;
   isLoading?: boolean;
   uploadProgress?: number;
   uploadSpeed?: number | null; // bytes per second
@@ -27,6 +28,7 @@ interface MediaUploaderProps {
  */
 export const MediaUploader: React.FC<MediaUploaderProps> = ({
   onFilesSelected,
+  onCancelUpload,
   isLoading = false,
   uploadProgress,
   uploadSpeed,
@@ -268,15 +270,33 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
             </button>
           )}
 
-          {/* Uploading State Button */}
+          {/* Uploading State - Show Cancel Button */}
           {isLoading && (
-            <button
-              disabled
-              className="mt-4 w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-400 text-white font-semibold rounded-lg cursor-not-allowed"
-            >
-              <Loader2 size={20} className="animate-spin" />
-              Uploading...
-            </button>
+            <div className="mt-4 flex gap-3">
+              <button
+                disabled
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gray-400 text-white font-semibold rounded-lg cursor-not-allowed"
+              >
+                <Loader2 size={20} className="animate-spin" />
+                Uploading...
+              </button>
+              {onCancelUpload && (
+                <button
+                  onClick={() => {
+                    onCancelUpload();
+                    setSelectedFiles([]);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = '';
+                    }
+                  }}
+                  className="flex items-center justify-center gap-2 px-6 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-all shadow-lg"
+                  title="Cancel upload"
+                >
+                  <XCircle size={20} />
+                  Cancel
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}

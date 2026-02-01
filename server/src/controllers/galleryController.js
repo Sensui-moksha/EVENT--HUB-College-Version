@@ -1,11 +1,15 @@
 import mongoose from 'mongoose';
 import Busboy from 'busboy';
 import { PassThrough } from 'stream';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import Gallery from '../models/Gallery.js';
 import GalleryMedia from '../models/GalleryMedia.js';
 import { storageManager } from '../utils/galleryUpload.js';
 import GalleryCacheManager from '../utils/galleryCacheManager.js';
 import serverCache, { invalidateCache } from '../services/cacheService.js';
+import mediaCacheService, { httpCacheHeaders } from '../services/mediaCacheService.js';
 import logger from '../utils/logger.js';
 import { 
   uploadToGridFS, 
@@ -20,7 +24,7 @@ import {
 // Lazy-load Event model (registered in main index.js)
 const getEventModel = () => mongoose.model('Event');
 
-// Initialize cache manager (100MB max in-memory cache)
+// Initialize cache manager (100MB max in-memory cache) - Legacy, keeping for Base64 storage
 const cacheManager = new GalleryCacheManager(100 * 1024 * 1024);
 
 /**
@@ -35,23 +39,40 @@ const cacheManager = new GalleryCacheManager(100 * 1024 * 1024);
  * - Retrieve gallery data (public and private)
  * - Serve media files from MongoDB (with caching)
  * 
- * Caching: Frequently accessed images are cached in memory for faster serving
+ * Caching Strategy:
+ * - In-memory cache for frequently accessed media (LRU eviction)
+ * - HTTP Cache headers for browser/CDN caching  
+ * - ETag support for conditional requests (304 Not Modified)
+ * - GridFS streaming for large videos (no memory buffering)
+ * 
  * Security: All operations enforce role-based access control
  */
 
 // ==================== PUBLIC OPERATIONS ====================
 
 /**
- * Serve media file from MongoDB with caching
+ * Serve media file from MongoDB with optimized caching
  * GET /api/gallery/media/:fileName
  * 
- * Supports both GridFS (new) and Base64 (legacy) storage.
- * GridFS files are streamed directly for better performance.
- * Base64 files are cached in memory after first access.
+ * Features:
+ * - ETag/Conditional requests (304 Not Modified)
+ * - HTTP Cache headers for browser/CDN caching
+ * - In-memory caching for hot content
+ * - GridFS streaming for videos (range requests)
+ * - Base64 fallback for legacy storage
  */
 export const serveMedia = async (req, res) => {
   try {
     const { fileName } = req.params;
+
+    // Check ETag for conditional request (304 Not Modified)
+    const cachedETag = mediaCacheService.getETag(fileName);
+    if (cachedETag && httpCacheHeaders.checkConditionalRequest(req, cachedETag)) {
+      res.status(304);
+      res.setHeader('ETag', cachedETag);
+      res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+      return res.end();
+    }
 
     // Get media document (without file data for GridFS)
     const media = await GalleryMedia.findOne({ fileName }).select('-fileData');
@@ -70,9 +91,13 @@ export const serveMedia = async (req, res) => {
           logger.production(`GridFS file not found for ${fileName}, checking Base64...`);
         } else {
           const fileSize = fileInfo.length;
+          const etag = `"${fileName}-${fileSize}"`;
           
           // For videos, always handle range requests for smooth playback
           if (isVideo) {
+            // Set video cache headers
+            httpCacheHeaders.forVideo(res, etag);
+            
             // Default chunk size for video buffering (2MB chunks for smooth ahead-loading)
             const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB - optimal for streaming
             
@@ -105,16 +130,20 @@ export const serveMedia = async (req, res) => {
             res.setHeader('Content-Length', contentLength);
             res.setHeader('Content-Type', media.mimeType);
             
-            // Aggressive caching for video chunks (7 days)
-            res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+            // ETag for this specific range
             res.setHeader('ETag', `"${fileName}-${start}-${end}"`);
             res.setHeader('X-Storage', 'GridFS');
             res.setHeader('X-Content-Duration', media.duration || '');
+            res.setHeader('X-Cache', 'STREAM');
             
             // CORS headers for video players
             res.setHeader('Access-Control-Allow-Origin', '*');
             res.setHeader('Access-Control-Allow-Headers', 'Range');
-            res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
+            res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, X-Cache');
+            
+            // CDN caching hints
+            res.setHeader('CDN-Cache-Control', 'public, max-age=2592000');
+            res.setHeader('Cloudflare-CDN-Cache-Control', 'public, max-age=2592000');
             
             // Timing headers for debugging
             res.setHeader('X-Chunk-Size', CHUNK_SIZE);
@@ -131,14 +160,16 @@ export const serveMedia = async (req, res) => {
             return;
           }
           
-          // For images - serve full file with caching
+          // For images - serve with aggressive caching
+          // Set image cache headers (7 days, immutable)
+          httpCacheHeaders.forImage(res, etag);
+          
           res.setHeader('Content-Type', media.mimeType);
           res.setHeader('Content-Disposition', `inline; filename="${media.fileName}"`);
           res.setHeader('Accept-Ranges', 'bytes');
           res.setHeader('Content-Length', fileSize);
-          res.setHeader('ETag', `"${fileName}"`);
           res.setHeader('X-Storage', 'GridFS');
-          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.setHeader('X-Cache', 'STREAM');
           
           const downloadStream = downloadFromGridFS(fileName);
           downloadStream.on('error', (err) => {
@@ -1288,15 +1319,39 @@ const uploadMediaStreamBase64 = async (req, res, eventId, userId) => {
 };
 
 // ==================== CHUNKED UPLOAD FOR LARGE FILES ====================
-// In-memory storage for chunked uploads (will be cleaned up after completion)
+// Uses temporary files on disk instead of memory for large video uploads
+// This prevents memory issues and Cloudflare timeouts for files up to 500MB
+
+// Metadata storage for chunked uploads (only stores metadata, not file data)
 const chunkedUploads = new Map();
+
+// Temp directory for chunk storage
+const CHUNK_TEMP_DIR = path.join(os.tmpdir(), 'event-hub-chunks');
+
+// Ensure temp directory exists
+try {
+  if (!fs.existsSync(CHUNK_TEMP_DIR)) {
+    fs.mkdirSync(CHUNK_TEMP_DIR, { recursive: true });
+  }
+} catch (err) {
+  logger.production(`[Chunked] Warning: Could not create temp directory: ${err.message}`);
+}
 
 // Cleanup stale chunked uploads after 1 hour
 setInterval(() => {
   const oneHourAgo = Date.now() - 60 * 60 * 1000;
   for (const [uploadId, upload] of chunkedUploads.entries()) {
     if (upload.lastActivity < oneHourAgo) {
-      logger.production(`Cleaning up stale chunked upload: ${uploadId}`);
+      logger.production(`[Chunked] Cleaning up stale upload: ${uploadId}`);
+      // Delete temp files
+      try {
+        const uploadDir = path.join(CHUNK_TEMP_DIR, uploadId);
+        if (fs.existsSync(uploadDir)) {
+          fs.rmSync(uploadDir, { recursive: true, force: true });
+        }
+      } catch (err) {
+        logger.production(`[Chunked] Error cleaning temp files: ${err.message}`);
+      }
       chunkedUploads.delete(uploadId);
     }
   }
@@ -1307,6 +1362,7 @@ setInterval(() => {
  * POST /api/gallery/:eventId/upload-chunk/init
  * 
  * For large video files that may timeout on Cloudflare (100s limit).
+ * Uses disk-based storage to handle files up to 500MB without memory issues.
  * Returns an uploadId to use for subsequent chunk uploads.
  */
 export const initChunkedUpload = async (req, res) => {
@@ -1350,7 +1406,16 @@ export const initChunkedUpload = async (req, res) => {
     const uploadId = `${eventId}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
     const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}-${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
 
-    // Store upload metadata
+    // Create temp directory for this upload
+    const uploadDir = path.join(CHUNK_TEMP_DIR, uploadId);
+    try {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    } catch (err) {
+      logger.production(`[Chunked] Failed to create temp directory: ${err.message}`);
+      return res.status(500).json({ error: 'Failed to initialize upload storage' });
+    }
+
+    // Store upload metadata (not file data - that goes to disk)
     chunkedUploads.set(uploadId, {
       eventId,
       galleryId: gallery._id.toString(),
@@ -1360,7 +1425,8 @@ export const initChunkedUpload = async (req, res) => {
       mimeType,
       fileSize: parseInt(fileSize),
       totalChunks: parseInt(totalChunks),
-      receivedChunks: new Map(),
+      receivedChunks: new Set(), // Just track which chunks received, not the data
+      uploadDir,
       lastActivity: Date.now(),
       status: 'initialized'
     });
@@ -1382,8 +1448,8 @@ export const initChunkedUpload = async (req, res) => {
  * Upload a chunk
  * POST /api/gallery/:eventId/upload-chunk/:uploadId/:chunkIndex
  * 
- * Uploads a single chunk of the file. Each chunk should be < 5MB to stay
- * well under Cloudflare's timeout limits.
+ * Uploads a single chunk of the file to a temp file on disk.
+ * This prevents memory issues for large video uploads.
  */
 export const uploadChunk = async (req, res) => {
   try {
@@ -1420,11 +1486,20 @@ export const uploadChunk = async (req, res) => {
       return res.status(400).json({ error: 'No chunk data received' });
     }
     
-    // Store chunk
-    upload.receivedChunks.set(index, chunkData);
+    // Write chunk to temp file on disk (not memory)
+    const chunkPath = path.join(upload.uploadDir, `chunk_${index.toString().padStart(5, '0')}`);
+    try {
+      fs.writeFileSync(chunkPath, chunkData);
+    } catch (err) {
+      logger.production(`[Chunked] Failed to write chunk to disk: ${err.message}`);
+      return res.status(500).json({ error: 'Failed to save chunk' });
+    }
+    
+    // Track which chunks we've received
+    upload.receivedChunks.add(index);
     upload.lastActivity = Date.now();
 
-    logger.production(`[Chunked] Received chunk ${index + 1}/${upload.totalChunks} for ${uploadId} (${(chunkData.length / 1024).toFixed(1)}KB)`);
+    logger.production(`[Chunked] Saved chunk ${index + 1}/${upload.totalChunks} for ${uploadId} (${(chunkData.length / 1024).toFixed(1)}KB)`);
 
     res.json({
       success: true,
@@ -1442,17 +1517,25 @@ export const uploadChunk = async (req, res) => {
  * Complete chunked upload
  * POST /api/gallery/:eventId/upload-chunk/:uploadId/complete
  * 
- * Assembles all chunks and saves to GridFS.
+ * Streams chunks from disk to GridFS - no memory buffering needed.
+ * This handles files up to 500MB without memory issues.
  */
 export const completeChunkedUpload = async (req, res) => {
+  let uploadId = null;
+  let upload = null;
+  
   try {
-    const { eventId, uploadId } = req.params;
+    const { eventId } = req.params;
+    uploadId = req.params.uploadId;
     const userId = req.user?.id;
 
+    logger.production(`[Chunked] Starting assembly for upload ${uploadId}`);
+
     // Validate upload exists
-    const upload = chunkedUploads.get(uploadId);
+    upload = chunkedUploads.get(uploadId);
     if (!upload) {
-      return res.status(404).json({ error: 'Upload not found or expired' });
+      logger.production(`[Chunked] Upload ${uploadId} not found or expired`);
+      return res.status(404).json({ error: 'Upload not found or expired. Please try uploading again.' });
     }
 
     if (upload.eventId !== eventId) {
@@ -1461,27 +1544,30 @@ export const completeChunkedUpload = async (req, res) => {
 
     // Check all chunks received
     if (upload.receivedChunks.size !== upload.totalChunks) {
+      logger.production(`[Chunked] Missing chunks for ${uploadId}: ${upload.receivedChunks.size}/${upload.totalChunks}`);
       return res.status(400).json({ 
-        error: `Missing chunks: received ${upload.receivedChunks.size}/${upload.totalChunks}`,
+        error: `Missing chunks: received ${upload.receivedChunks.size}/${upload.totalChunks}. Some chunks may have failed to upload.`,
         receivedChunks: upload.receivedChunks.size,
-        totalChunks: upload.totalChunks
+        totalChunks: upload.totalChunks,
+        retryable: true
       });
     }
 
-    // Assemble chunks in order
-    const orderedChunks = [];
+    // Verify all chunk files exist on disk
+    logger.production(`[Chunked] Verifying ${upload.totalChunks} chunk files for ${uploadId}...`);
     for (let i = 0; i < upload.totalChunks; i++) {
-      const chunk = upload.receivedChunks.get(i);
-      if (!chunk) {
-        return res.status(400).json({ error: `Missing chunk ${i}` });
+      const chunkPath = path.join(upload.uploadDir, `chunk_${i.toString().padStart(5, '0')}`);
+      if (!fs.existsSync(chunkPath)) {
+        logger.production(`[Chunked] Missing chunk file ${i} for ${uploadId}`);
+        return res.status(400).json({ error: `Missing chunk ${i}. Please try uploading again.`, retryable: true });
       }
-      orderedChunks.push(chunk);
     }
-    const completeFile = Buffer.concat(orderedChunks);
 
-    // Upload to GridFS
+    // Upload to GridFS by streaming chunks directly (no memory buffering)
     const mediaType = upload.mimeType.startsWith('video') ? 'video' : 'image';
     const publicUrl = `/api/gallery/media/${upload.fileName}`;
+
+    logger.production(`[Chunked] Streaming ${upload.totalChunks} chunks to GridFS for ${uploadId}...`);
 
     const gridFSUploadStream = createUploadStream(upload.fileName, {
       eventId,
@@ -1492,11 +1578,49 @@ export const completeChunkedUpload = async (req, res) => {
       uploadedBy: userId
     });
 
-    await new Promise((resolve, reject) => {
-      gridFSUploadStream.on('finish', resolve);
-      gridFSUploadStream.on('error', reject);
-      gridFSUploadStream.end(completeFile);
-    });
+    let totalBytesWritten = 0;
+
+    try {
+      // Stream each chunk file to GridFS in order
+      for (let i = 0; i < upload.totalChunks; i++) {
+        const chunkPath = path.join(upload.uploadDir, `chunk_${i.toString().padStart(5, '0')}`);
+        const chunkData = fs.readFileSync(chunkPath);
+        
+        await new Promise((resolve, reject) => {
+          const canContinue = gridFSUploadStream.write(chunkData, (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+          // If buffer is full, wait for drain
+          if (!canContinue) {
+            gridFSUploadStream.once('drain', resolve);
+          }
+        });
+        
+        totalBytesWritten += chunkData.length;
+        
+        // Log progress for large files
+        if (i % 10 === 0 || i === upload.totalChunks - 1) {
+          logger.production(`[Chunked] GridFS progress: ${i + 1}/${upload.totalChunks} chunks (${(totalBytesWritten / 1024 / 1024).toFixed(1)}MB)`);
+        }
+      }
+
+      // Finalize the GridFS upload
+      await new Promise((resolve, reject) => {
+        gridFSUploadStream.end((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      logger.production(`[Chunked] GridFS upload complete for ${uploadId}: ${(totalBytesWritten / 1024 / 1024).toFixed(2)}MB`);
+    } catch (gridfsError) {
+      logger.production(`[Chunked] GridFS error for ${uploadId}: ${gridfsError.message}`);
+      return res.status(500).json({ 
+        error: `Failed to save file to storage: ${gridfsError.message}`,
+        retryable: true 
+      });
+    }
 
     // Create media document
     const gallery = await Gallery.findById(upload.galleryId);
@@ -1511,7 +1635,7 @@ export const completeChunkedUpload = async (req, res) => {
       publicUrl,
       type: mediaType,
       mimeType: upload.mimeType,
-      fileSize: completeFile.length,
+      fileSize: totalBytesWritten,
       dimensions: null,
       duration: null,
       order: 0,
@@ -1526,11 +1650,18 @@ export const completeChunkedUpload = async (req, res) => {
       await gallery.save();
     }
 
-    // Cleanup
+    // Cleanup temp files and metadata
+    try {
+      if (upload.uploadDir && fs.existsSync(upload.uploadDir)) {
+        fs.rmSync(upload.uploadDir, { recursive: true, force: true });
+      }
+    } catch (cleanupErr) {
+      logger.production(`[Chunked] Warning: Failed to cleanup temp files: ${cleanupErr.message}`);
+    }
     chunkedUploads.delete(uploadId);
     invalidateCache.onGalleryChange(serverCache, eventId);
 
-    logger.production(`[Chunked] Completed upload ${uploadId}: ${upload.originalName} (${(completeFile.length / 1024 / 1024).toFixed(2)}MB)`);
+    logger.production(`[Chunked] Successfully completed upload ${uploadId}: ${upload.originalName} (${(totalBytesWritten / 1024 / 1024).toFixed(2)}MB)`);
 
     res.json({
       success: true,
@@ -1539,20 +1670,42 @@ export const completeChunkedUpload = async (req, res) => {
       storageType: 'gridfs'
     });
   } catch (error) {
-    logger.production('Error completing chunked upload:', error.message);
-    res.status(500).json({ error: 'Failed to complete upload' });
+    logger.production(`[Chunked] Error completing upload ${uploadId}: ${error.message}`);
+    // Try to cleanup on error
+    if (uploadId && upload) {
+      try {
+        if (upload.uploadDir && fs.existsSync(upload.uploadDir)) {
+          fs.rmSync(upload.uploadDir, { recursive: true, force: true });
+        }
+      } catch { /* ignore cleanup error */ }
+      chunkedUploads.delete(uploadId);
+    }
+    res.status(500).json({ 
+      error: `Failed to complete upload: ${error.message}`,
+      retryable: true 
+    });
   }
 };
 
 /**
  * Cancel chunked upload
  * DELETE /api/gallery/:eventId/upload-chunk/:uploadId
+ * Cleans up temp files and metadata
  */
 export const cancelChunkedUpload = async (req, res) => {
   try {
     const { uploadId } = req.params;
     
-    if (chunkedUploads.has(uploadId)) {
+    const upload = chunkedUploads.get(uploadId);
+    if (upload) {
+      // Delete temp files
+      try {
+        if (upload.uploadDir && fs.existsSync(upload.uploadDir)) {
+          fs.rmSync(upload.uploadDir, { recursive: true, force: true });
+        }
+      } catch (err) {
+        logger.production(`[Chunked] Warning: Failed to cleanup temp files: ${err.message}`);
+      }
       chunkedUploads.delete(uploadId);
       logger.production(`[Chunked] Cancelled upload ${uploadId}`);
     }

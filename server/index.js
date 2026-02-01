@@ -81,6 +81,7 @@ import {
 // Cache imports for high-traffic optimization
 import serverCache, { CACHE_TTL, cacheKeys, invalidateCache } from './src/services/cacheService.js';
 import { routeCache, cacheMiddleware, invalidateCacheMiddleware } from './src/middleware/cacheMiddleware.js';
+import mediaCacheService from './src/services/mediaCacheService.js';
 
 // Production-safe logger
 import logger from './src/utils/logger.js';
@@ -479,6 +480,35 @@ app.post('/api/admin/maintenance/run', async (req, res) => {
 app.get('/api/admin/maintenance/logs', (req, res) => {
   const limit = req.query.limit ? parseInt(req.query.limit) : 100;
   res.json(getMaintenanceLogs(limit));
+});
+
+// Cache statistics endpoints (admin only)
+app.get('/api/admin/cache/stats', (req, res) => {
+  res.json({
+    serverCache: serverCache.getStats(),
+    mediaCache: mediaCacheService.getStats(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.post('/api/admin/cache/clear', (req, res) => {
+  const { type } = req.body;
+  if (type === 'media') {
+    mediaCacheService.clear();
+  } else if (type === 'server') {
+    serverCache.flush();
+  } else {
+    mediaCacheService.clear();
+    serverCache.flush();
+  }
+  res.json({ success: true, message: `Cache cleared: ${type || 'all'}` });
+});
+
+app.post('/api/admin/cache/invalidate/:eventId', (req, res) => {
+  const { eventId } = req.params;
+  const count = mediaCacheService.invalidateByEvent(eventId);
+  invalidateCache.onGalleryChange(serverCache, eventId);
+  res.json({ success: true, invalidated: count, eventId });
 });
 
 // Alert endpoints (admin only)
@@ -6800,6 +6830,38 @@ cron.schedule('0 4 * * *', async () => {
     }
   } catch (error) {
     console.error('Error in cleanup cron:', error);
+  }
+});
+
+// Index maintenance and reindexing (runs weekly on Sunday at 2 AM)
+cron.schedule('0 2 * * 0', async () => {
+  try {
+    console.log('🔧 Starting weekly index maintenance...');
+    const result = await runFullMaintenance();
+    console.log(`✅ Index maintenance completed:`, result);
+  } catch (error) {
+    console.error('❌ Error in index maintenance cron:', error);
+  }
+});
+
+// Cache health check (runs every 15 minutes)
+cron.schedule('*/15 * * * *', async () => {
+  try {
+    const serverStats = serverCache.getStats();
+    const mediaStats = mediaCacheService.getStats();
+    
+    // Log cache stats periodically
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`📊 Cache Stats - Server: ${serverStats.keys} keys (${serverStats.hitRate}), Media: ${mediaStats.itemCount} items (${mediaStats.hitRate})`);
+    }
+    
+    // Alert if cache utilization is very high (>90%)
+    const utilization = parseFloat(mediaStats.utilizationPercent);
+    if (utilization > 90) {
+      console.warn(`⚠️ Media cache utilization high: ${utilization}% - consider increasing MEDIA_CACHE_SIZE_MB`);
+    }
+  } catch (error) {
+    console.error('Error in cache health check:', error);
   }
 });
 

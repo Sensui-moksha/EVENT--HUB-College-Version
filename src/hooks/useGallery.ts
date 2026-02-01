@@ -278,43 +278,69 @@ export const useGalleryUpload = (eventId: string) => {
         
         // 3. Complete upload with retry logic for network resilience
         setUploadStatus('Assembling file...');
-        let completeRetries = 5;
+        let completeRetries = 7; // Increased retries for slow connections
         let completeError: Error | null = null;
-        let completeResponse: { success: boolean; error?: string; media?: GalleryMedia } | null = null;
+        let completeResponse: { success: boolean; error?: string; retryable?: boolean; media?: GalleryMedia } | null = null;
         
         while (completeRetries > 0) {
           try {
-            completeResponse = await apiRequest(
-              `/api/gallery/${eventId}/upload-chunk/${uploadId}/complete`,
-              { method: 'POST' }
+            // Use fetch directly with longer timeout for assembly
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 4 * 60 * 1000); // 4 minute timeout
+            
+            const response = await fetch(
+              getApiUrl(`/api/gallery/${eventId}/upload-chunk/${uploadId}/complete`),
+              { 
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal
+              }
             );
+            
+            clearTimeout(timeoutId);
+            completeResponse = await response.json();
             
             if (completeResponse.success) {
               break; // Success!
+            }
+            
+            // Check if server says it's not retryable
+            if (completeResponse.retryable === false) {
+              throw new Error(completeResponse.error || 'Upload cannot be completed');
             }
             
             completeError = new Error(completeResponse.error || 'Failed to complete upload');
             completeRetries--;
             
             if (completeRetries > 0) {
-              console.log(`[Chunked] Complete request failed, retrying... (${completeRetries} attempts left)`);
-              setUploadStatus(`Assembling file... (retry ${5 - completeRetries}/5)`);
-              await new Promise(r => setTimeout(r, 2000)); // Wait 2s before retry
+              console.log(`[Chunked] Complete request failed, retrying... (${completeRetries} attempts left):`, completeError.message);
+              setUploadStatus(`Assembling file... (retry ${7 - completeRetries}/7)`);
+              await new Promise(r => setTimeout(r, 3000)); // Wait 3s before retry
             }
           } catch (err) {
-            completeError = err instanceof Error ? err : new Error(String(err));
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            const isAbort = errorMsg.includes('aborted') || errorMsg.includes('abort');
+            const isTimeout = isAbort || errorMsg.includes('timeout');
+            const isNetworkError = errorMsg.includes('fetch') || errorMsg.includes('network') || errorMsg.includes('Failed to fetch');
+            
+            completeError = new Error(
+              isTimeout ? 'Server is taking too long to assemble the file. Retrying...' :
+              isNetworkError ? 'Network connection lost. Retrying...' :
+              errorMsg
+            );
             completeRetries--;
             
             if (completeRetries > 0) {
               console.log(`[Chunked] Complete request error, retrying... (${completeRetries} attempts left):`, completeError.message);
-              setUploadStatus(`Assembling file... (retry ${5 - completeRetries}/5)`);
-              await new Promise(r => setTimeout(r, 2000)); // Wait 2s before retry
+              setUploadStatus(`Assembling file... (retry ${7 - completeRetries}/7)`);
+              await new Promise(r => setTimeout(r, isTimeout ? 5000 : 3000)); // Wait longer after timeout
             }
           }
         }
         
         if (!completeResponse?.success) {
-          throw completeError || new Error('Failed to complete upload after all retries');
+          throw completeError || new Error('Failed to assemble file after multiple attempts. Please try again.');
         }
         
         return completeResponse.media as GalleryMedia;

@@ -39,7 +39,7 @@ export const GalleryManager: React.FC = () => {
     refetch
   } = useGalleryManagement(eventId || '');
 
-  const { uploading, uploadError, uploadProgress, uploadSpeed, timeRemaining, uploadedBytes, totalBytes, uploadFiles, uploadStatus } = useGalleryUpload(eventId || '');
+  const { uploading, uploadError, uploadProgress, uploadSpeed, timeRemaining, uploadedBytes, totalBytes, uploadFiles, uploadStatus, cancelUpload } = useGalleryUpload(eventId || '');
 
   const handleFileUpload = async (files: File[]) => {
     try {
@@ -228,6 +228,7 @@ export const GalleryManager: React.FC = () => {
           <div className="bg-white rounded-lg shadow p-8 mb-8">
             <MediaUploader
               onFilesSelected={handleFileUpload}
+              onCancelUpload={cancelUpload}
               isLoading={uploading}
               uploadProgress={uploadProgress}
               uploadSpeed={uploadSpeed}

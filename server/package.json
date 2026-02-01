@@ -8,10 +8,11 @@
     "npm": ">=9.0.0"
   },
   "scripts": {
-    "start": "cross-env NODE_ENV=production node index.js",
-    "dev": "cross-env NODE_ENV=development nodemon index.js",
-    "start:windows": "set NODE_ENV=production && node index.js",
-    "start:unix": "NODE_ENV=production node index.js"
+    "start": "cross-env NODE_ENV=production node --max-old-space-size=4096 --optimize-for-size index.js",
+    "dev": "cross-env NODE_ENV=development node --max-old-space-size=2048 nodemon index.js",
+    "start:windows": "set NODE_ENV=production && node --max-old-space-size=4096 --optimize-for-size index.js",
+    "start:unix": "NODE_ENV=production node --max-old-space-size=4096 --optimize-for-size index.js",
+    "start:low-memory": "cross-env NODE_ENV=production node --max-old-space-size=1024 --optimize-for-size index.js"
   },
   "dependencies": {
     "busboy": "^1.6.0",

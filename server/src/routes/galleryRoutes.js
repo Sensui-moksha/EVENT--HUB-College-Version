@@ -145,11 +145,18 @@ router.post(
 /**
  * Complete chunked upload
  * POST /api/gallery/:eventId/upload-chunk/:uploadId/complete
+ * Note: Extended timeout for assembling and saving large files
  */
 router.post(
   '/:eventId/upload-chunk/:uploadId/complete',
   authenticateToken,
   authorizeRole('admin', 'organizer'),
+  // Extend timeout for file assembly (up to 5 minutes)
+  (req, res, next) => {
+    req.setTimeout(5 * 60 * 1000);
+    res.setTimeout(5 * 60 * 1000);
+    next();
+  },
   galleryController.completeChunkedUpload
 );
 
