@@ -242,10 +242,16 @@ app.use((req, res, next) => {
 
 // Raw body parser for chunked uploads (must be BEFORE express.json())
 // This allows binary chunk data to be received without JSON parsing
-app.use('/api/gallery', (req, res, next) => {
-  // Only use raw parser for chunk upload routes
-  if (req.path.includes('/upload-chunk/') && !req.path.endsWith('/init') && !req.path.endsWith('/complete')) {
-    express.raw({ type: 'application/octet-stream', limit: '10mb' })(req, res, next);
+// Matches paths like: /api/gallery/:eventId/upload-chunk/:uploadId/:chunkIndex
+app.use((req, res, next) => {
+  // Match chunk upload routes: /api/gallery/.../upload-chunk/.../0-999 (chunk index)
+  const chunkUploadPattern = /^\/api\/gallery\/[^/]+\/upload-chunk\/[^/]+\/\d+$/;
+  if (req.method === 'POST' && chunkUploadPattern.test(req.path)) {
+    // Use raw parser for binary chunk data
+    express.raw({ 
+      type: '*/*', // Accept any content type for binary data
+      limit: '10mb'
+    })(req, res, next);
   } else {
     next();
   }
@@ -257,18 +263,28 @@ app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 // Middleware: remove problematic integrity attributes for Cloudflare Insights
 // Some CDNs or proxies may alter the script but leave an outdated SRI hash,
 // which causes the browser to block the resource. This middleware strips
-// integrity and crossorigin attributes for the known Cloudflare Insights URL
-// from HTML responses to avoid that failure.
+// integrity attributes from script tags that load cloudflareinsights scripts.
 app.use((req, res, next) => {
   const originalSend = res.send;
   res.send = function (body) {
     try {
       const contentType = res.getHeader('Content-Type') || '';
       if (contentType.includes('text/html') && typeof body === 'string') {
-        // Remove integrity attributes that reference static.cloudflareinsights.com
-        body = body.replace(/integrity\s*=\s*"[^"]*static\.cloudflareinsights\.com[^"]*"/ig, '');
-        // Also remove crossorigin attributes used with SRI for that script
-        body = body.replace(/crossorigin\s*=\s*"[^"]*"/ig, '');
+        // Remove integrity and crossorigin attributes from Cloudflare Insights script tags
+        // Match: <script ...src="...cloudflareinsights..." integrity="..." crossorigin="...">
+        body = body.replace(
+          /(<script[^>]*src\s*=\s*["'][^"']*cloudflareinsights[^"']*["'][^>]*)\s+integrity\s*=\s*["'][^"']*["']/gi,
+          '$1'
+        );
+        body = body.replace(
+          /(<script[^>]*src\s*=\s*["'][^"']*cloudflareinsights[^"']*["'][^>]*)\s+crossorigin\s*=\s*["'][^"']*["']/gi,
+          '$1'
+        );
+        // Also handle case where integrity comes before src
+        body = body.replace(
+          /(<script[^>]*)\s+integrity\s*=\s*["'][^"']*["']([^>]*src\s*=\s*["'][^"']*cloudflareinsights[^"']*["'])/gi,
+          '$1$2'
+        );
       }
     } catch (e) {
       logger.production('[SRI] Error while sanitizing HTML response:', e && e.message);

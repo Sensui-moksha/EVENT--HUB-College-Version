@@ -1468,11 +1468,20 @@ export const uploadChunk = async (req, res) => {
 
     let chunkData;
     
+    // Log incoming request details for debugging
+    logger.production(`[Chunked] Receiving chunk ${index} for ${uploadId}, Content-Type: ${req.headers['content-type']}, Content-Length: ${req.headers['content-length']}`);
+    
     // Check if body was parsed by express.raw() middleware
     if (Buffer.isBuffer(req.body) && req.body.length > 0) {
       chunkData = req.body;
+      logger.production(`[Chunked] Got chunk data from req.body: ${chunkData.length} bytes`);
+    } else if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+      // Body might have been parsed as JSON - this shouldn't happen but log it
+      logger.production(`[Chunked] Warning: req.body is object, not buffer. Keys: ${Object.keys(req.body).join(', ')}`);
+      return res.status(400).json({ error: 'Invalid chunk data format - expected binary data' });
     } else {
       // Fallback: Read from stream if not already parsed
+      logger.production(`[Chunked] Reading chunk from stream...`);
       const chunks = [];
       await new Promise((resolve, reject) => {
         req.on('data', chunk => chunks.push(chunk));
@@ -1480,6 +1489,7 @@ export const uploadChunk = async (req, res) => {
         req.on('error', reject);
       });
       chunkData = Buffer.concat(chunks);
+      logger.production(`[Chunked] Got chunk data from stream: ${chunkData.length} bytes`);
     }
     
     if (!chunkData || chunkData.length === 0) {

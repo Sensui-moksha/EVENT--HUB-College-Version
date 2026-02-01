@@ -226,6 +226,9 @@ export const useGalleryUpload = (eventId: string) => {
           
           setUploadStatus(`Uploading chunk ${i + 1}/${totalChunks}...`);
           
+          // Convert blob to ArrayBuffer for reliable Content-Length with HTTP/2
+          const chunkArrayBuffer = await chunk.arrayBuffer();
+          
           // Upload chunk with retry
           let retries = 3;
           let lastError: Error | null = null;
@@ -237,11 +240,12 @@ export const useGalleryUpload = (eventId: string) => {
                 getApiUrl(`/api/gallery/${eventId}/upload-chunk/${uploadId}/${i}`),
                 {
                   method: 'POST',
-                  body: chunk,
+                  body: chunkArrayBuffer,
                   credentials: 'include',
                   signal: abortControllerRef.current?.signal,
                   headers: {
-                    'Content-Type': 'application/octet-stream'
+                    'Content-Type': 'application/octet-stream',
+                    'Content-Length': chunkArrayBuffer.byteLength.toString()
                   }
                 }
               );
