@@ -1318,9 +1318,10 @@ const uploadMediaStreamBase64 = async (req, res, eventId, userId) => {
   req.pipe(busboy);
 };
 
-// ==================== CHUNKED UPLOAD FOR LARGE FILES ====================
-// Uses temporary files on disk instead of memory for large video uploads
-// This prevents memory issues and Cloudflare timeouts for files up to 500MB
+// ==================== CHUNKED UPLOAD FOR VERY LARGE FILES ====================
+// For files > 100MB only - regular files < 100MB upload directly to MongoDB
+// Uses temporary disk storage instead of memory for very large video uploads
+// This prevents memory issues for files that must be uploaded in chunks
 
 // Metadata storage for chunked uploads (only stores metadata, not file data)
 const chunkedUploads = new Map();
@@ -1361,9 +1362,11 @@ setInterval(() => {
  * Initialize chunked upload
  * POST /api/gallery/:eventId/upload-chunk/init
  * 
- * For large video files that may timeout on Cloudflare (100s limit).
+ * For very large video files > 100MB only
  * Uses disk-based storage to handle files up to 500MB without memory issues.
  * Returns an uploadId to use for subsequent chunk uploads.
+ * 
+ * Files < 100MB should upload directly via /upload or /upload-stream endpoints
  */
 export const initChunkedUpload = async (req, res) => {
   try {

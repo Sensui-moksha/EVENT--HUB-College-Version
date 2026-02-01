@@ -126,9 +126,14 @@ export const useGallery = (eventId: string) => {
  * Uses XMLHttpRequest for reliable progress tracking and background tab support
  * GridFS-only uploads for maximum performance
  * 
- * CHUNKED UPLOAD for large videos:
- * - Videos over 3MB use chunked upload to avoid Cloudflare 100s timeout
- * - 2MB chunks ensure each request completes quickly
+ * DIRECT UPLOAD for all videos < 100MB:
+ * - Files up to 100MB upload directly to MongoDB via GridFS
+ * - Smooth, straightforward upload process
+ * - No chunking overhead for typical video files
+ * 
+ * CHUNKED UPLOAD for very large files (> 100MB):
+ * - Videos over 100MB use chunked upload to avoid timeouts
+ * - 5MB chunks ensure stable upload even on slower connections
  * - Automatic retry on chunk failure
  * 
  * BACKGROUND TAB BEHAVIOR:
@@ -138,8 +143,8 @@ export const useGallery = (eventId: string) => {
  */
 
 // Chunked upload threshold and chunk size
-const CHUNKED_UPLOAD_THRESHOLD = 3 * 1024 * 1024; // 3MB - use chunked for larger videos
-const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB chunks - safe for Cloudflare timeout
+const CHUNKED_UPLOAD_THRESHOLD = 100 * 1024 * 1024; // 100MB - use chunked only for very large files
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks - safer for stable connections
 
 export const useGalleryUpload = (eventId: string) => {
   const [uploading, setUploading] = useState(false);

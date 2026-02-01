@@ -74,6 +74,13 @@ router.post(
  * Upload media to gallery
  * POST /api/gallery/:eventId/upload
  * 
+ * Direct upload to MongoDB GridFS - smooth uploads for all files < 500MB
+ * No chunking required - files upload in one request for smooth experience
+ * 
+ * For files < 2MB: Instant upload
+ * For files 2-100MB: Smooth direct upload
+ * For files 100-500MB: Use /upload-chunk endpoints for chunked upload
+ * 
  * Request:
  *   - Multipart form with files
  *   - Field 'mediaType' can specify 'image' or 'video'
@@ -98,11 +105,23 @@ router.post(
 );
 
 /**
- * FAST STREAMING UPLOAD - Bypasses memory buffering for faster uploads
+ * FAST STREAMING UPLOAD - Direct to MongoDB for smooth uploads
  * POST /api/gallery/:eventId/upload-stream
  * 
- * Use this endpoint for large files (videos). It streams directly to MongoDB
- * without loading the entire file into memory first, resulting in:\n * - 2-3x faster upload speeds\n * - Lower memory usage\n * - Better handling of large files\n * \n * Request:\n *   - Multipart form with files (field name: 'files')\n * \n * Response:\n *   - Array of uploaded media objects\n */
+ * Streams files directly to MongoDB GridFS without memory buffering
+ * Results in smooth uploads for all file sizes < 100MB:
+ * - 2MB files: Near instant
+ * - 50MB files: Smooth and responsive
+ * - 100MB files: Uses 5MB chunks internally but appears seamless
+ * 
+ * For files > 100MB, use chunked upload endpoints (/upload-chunk)
+ * 
+ * Request:
+ *   - Multipart form with files (field name: 'files')
+ * 
+ * Response:
+ *   - Array of uploaded media objects with storage confirmation
+ */
 router.post(
   '/:eventId/upload-stream',
   // Extend request timeout for streaming uploads (15 minutes)
@@ -118,7 +137,8 @@ router.post(
 );
 
 // ==================== CHUNKED UPLOAD ROUTES ====================
-// For large video files that may timeout on Cloudflare (100s limit)
+// For very large video files > 100MB only
+// Regular files < 100MB should use /upload or /upload-stream endpoints for smooth uploads
 
 /**
  * Initialize chunked upload
