@@ -41,9 +41,12 @@ const ENDPOINT_LIMITS = {
   '/api/events/*/teams': { windowMs: 60 * 1000, maxRequests: 60 },      // 60 per minute
   '/api/events/*/registrations/pending': { windowMs: 60 * 1000, maxRequests: 60 }, // 60 per minute
   
-  // Upload endpoints - stricter limits
-  '/api/upload': { windowMs: 60 * 1000, maxRequests: 20 },             // 20 per minute
-  '/api/gallery/*/upload': { windowMs: 60 * 1000, maxRequests: 10 },
+  // Upload endpoints - RELAXED for faster uploads
+  '/api/upload': { windowMs: 60 * 1000, maxRequests: 100 },             // 100 per minute
+  '/api/gallery/*/upload': { windowMs: 60 * 1000, maxRequests: 50 },    // 50 per minute
+  '/api/gallery/*/upload-chunk/*': { windowMs: 60 * 1000, maxRequests: 500 }, // 500 chunks per minute (for video uploads)
+  '/api/images/upload': { windowMs: 60 * 1000, maxRequests: 50 },       // 50 per minute
+  '/api/events/*/image': { windowMs: 60 * 1000, maxRequests: 30 },      // 30 per minute
   
   // Admin endpoints - relaxed limits
   '/api/admin/*': { windowMs: 60 * 1000, maxRequests: 200 },

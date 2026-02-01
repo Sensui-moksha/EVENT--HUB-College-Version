@@ -213,18 +213,19 @@ export const useGalleryUpload = (eventId: string) => {
       abortControllerRef.current = new AbortController();
       
       try {
-        // 2. Upload each chunk
-        for (let i = 0; i < totalChunks; i++) {
+        // 2. Upload chunks in PARALLEL batches for faster upload speeds
+        const PARALLEL_UPLOADS = 3; // Upload 3 chunks simultaneously
+        
+        // Helper function to upload a single chunk with retry
+        const uploadChunk = async (chunkIndex: number): Promise<void> => {
           if (abortControllerRef.current?.signal.aborted) {
             throw new Error('Upload cancelled');
           }
           
-          const start = i * CHUNK_SIZE;
+          const start = chunkIndex * CHUNK_SIZE;
           const end = Math.min(start + CHUNK_SIZE, file.size);
           const chunk = file.slice(start, end);
           const chunkSize = end - start;
-          
-          setUploadStatus(`Uploading chunk ${i + 1}/${totalChunks}...`);
           
           // Convert blob to ArrayBuffer for reliable Content-Length with HTTP/2
           const chunkArrayBuffer = await chunk.arrayBuffer();
@@ -232,12 +233,13 @@ export const useGalleryUpload = (eventId: string) => {
           // Upload chunk with retry
           let retries = 3;
           let lastError: Error | null = null;
+          
           while (retries > 0) {
             try {
-              console.log(`[Chunked] Uploading chunk ${i + 1}/${totalChunks} (${(chunkSize / 1024).toFixed(1)}KB)`);
+              console.log(`[Chunked] Uploading chunk ${chunkIndex + 1}/${totalChunks} (${(chunkSize / 1024).toFixed(1)}KB)`);
               
               const chunkResponse = await fetch(
-                getApiUrl(`/api/gallery/${eventId}/upload-chunk/${uploadId}/${i}`),
+                getApiUrl(`/api/gallery/${eventId}/upload-chunk/${uploadId}/${chunkIndex}`),
                 {
                   method: 'POST',
                   body: chunkArrayBuffer,
@@ -261,23 +263,38 @@ export const useGalleryUpload = (eventId: string) => {
               }
               
               const result = await chunkResponse.json();
-              console.log(`[Chunked] Chunk ${i + 1} uploaded:`, result);
+              console.log(`[Chunked] Chunk ${chunkIndex + 1} uploaded:`, result);
               
               uploadedChunks++;
               // Update progress based on actual bytes uploaded
               onProgress(Math.min(uploadedChunks * CHUNK_SIZE, file.size), file.size);
-              break; // Success, exit retry loop
+              return; // Success
             } catch (err) {
               lastError = err instanceof Error ? err : new Error(String(err));
               retries--;
               if (retries === 0) {
-                console.error(`[Chunked] Failed to upload chunk ${i} after all retries:`, lastError);
+                console.error(`[Chunked] Failed to upload chunk ${chunkIndex} after all retries:`, lastError);
                 throw lastError;
               }
-              console.log(`[Chunked] Retrying chunk ${i}, ${retries} attempts left. Error:`, lastError.message);
+              console.log(`[Chunked] Retrying chunk ${chunkIndex}, ${retries} attempts left. Error:`, lastError.message);
               await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
             }
           }
+        };
+        
+        // Upload chunks in parallel batches
+        for (let batchStart = 0; batchStart < totalChunks; batchStart += PARALLEL_UPLOADS) {
+          const batchEnd = Math.min(batchStart + PARALLEL_UPLOADS, totalChunks);
+          const batchIndices = [];
+          
+          for (let i = batchStart; i < batchEnd; i++) {
+            batchIndices.push(i);
+          }
+          
+          setUploadStatus(`Uploading chunks ${batchStart + 1}-${batchEnd}/${totalChunks}...`);
+          
+          // Upload batch in parallel
+          await Promise.all(batchIndices.map(index => uploadChunk(index)));
         }
         
         // 3. Complete upload with retry logic for network resilience
