@@ -189,7 +189,8 @@ export const useGalleryUpload = (eventId: string) => {
 
   /**
    * Upload a single large file using chunked upload
-   * This avoids Cloudflare's 100-second timeout by uploading in small pieces
+   * This is only used for very large files (>100MB) as a fallback
+   * For most files, direct upload with extended timeouts is preferred
    */
   const uploadFileChunked = useCallback(
     async (file: File, onProgress: (loaded: number, total: number) => void): Promise<GalleryMedia> => {
@@ -438,8 +439,8 @@ export const useGalleryUpload = (eventId: string) => {
             const xhr = new XMLHttpRequest();
             setCurrentXhr(xhr);
             
-            // 60 minute timeout for very large videos (increased from 30)
-            xhr.timeout = 60 * 60 * 1000;
+            // 90 minute timeout for very large videos without chunking
+            xhr.timeout = 90 * 60 * 1000;
             
             // Track upload metrics
             const startTime = Date.now();

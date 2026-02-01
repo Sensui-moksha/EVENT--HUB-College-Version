@@ -94,10 +94,10 @@ const server = http.createServer(app);
 
 // Configure server timeouts for large file uploads
 // These settings prevent ERR_HTTP2_PROTOCOL_ERROR on slow/large uploads
-server.timeout = 30 * 60 * 1000; // 30 minutes for very large uploads
-server.keepAliveTimeout = 120 * 1000; // 2 minutes (longer for slow connections)
-server.headersTimeout = 125 * 1000; // Slightly longer than keepAliveTimeout
-server.requestTimeout = 30 * 60 * 1000; // 30 minutes for request processing
+server.timeout = 45 * 60 * 1000; // 45 minutes for very large uploads without chunking
+server.keepAliveTimeout = 180 * 1000; // 3 minutes (longer for slow connections)
+server.headersTimeout = 185 * 1000; // Slightly longer than keepAliveTimeout
+server.requestTimeout = 45 * 60 * 1000; // 45 minutes for request processing
 
 // Check if running in production
 const isProduction = process.env.NODE_ENV === 'production';
@@ -219,8 +219,66 @@ app.use(cors(corsOptions));
 // Explicit OPTIONS handler for preflight requests
 app.options('*', cors(corsOptions));
 
-// Trust proxy (important for production behind reverse proxy like Nginx)
+// Trust proxy (important for production behind reverse proxy like Nginx/Cloudflare)
 app.set('trust proxy', 1);
+
+// Cloudflare timeout prevention middleware for upload routes
+// Sends periodic keep-alive bytes to prevent Cloudflare's 100-second timeout
+app.use((req, res, next) => {
+  // Only apply to upload routes
+  const isUploadRoute = req.path.includes('/upload') && req.method === 'POST';
+  
+  if (isUploadRoute) {
+    // Disable buffering to stream response immediately
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Connection', 'keep-alive');
+    
+    // For Cloudflare: these headers hint to bypass caching/timeout
+    res.setHeader('CF-Cache-Status', 'BYPASS');
+    
+    // Send periodic keep-alive comments to prevent timeout
+    // Cloudflare has a 100s timeout for no data, so we send a space every 30s
+    let keepAliveInterval = null;
+    let responseStarted = false;
+    
+    // Track if response has started
+    const originalWrite = res.write.bind(res);
+    res.write = function(chunk, ...args) {
+      responseStarted = true;
+      return originalWrite(chunk, ...args);
+    };
+    
+    // Start keep-alive after 30 seconds if response hasn't started
+    const startKeepAlive = () => {
+      if (keepAliveInterval) return;
+      keepAliveInterval = setInterval(() => {
+        if (!responseStarted && !res.writableEnded) {
+          // Send a space character as keep-alive (won't affect JSON parsing)
+          try {
+            res.write(' ');
+          } catch (e) {
+            // Response may have ended
+            if (keepAliveInterval) clearInterval(keepAliveInterval);
+          }
+        }
+      }, 30000); // Every 30 seconds
+    };
+    
+    // Start keep-alive timer
+    setTimeout(startKeepAlive, 30000);
+    
+    // Clean up on response end
+    res.on('finish', () => {
+      if (keepAliveInterval) clearInterval(keepAliveInterval);
+    });
+    res.on('close', () => {
+      if (keepAliveInterval) clearInterval(keepAliveInterval);
+    });
+  }
+  
+  next();
+});
 
 // Request metrics middleware for health monitoring
 app.use((req, res, next) => {

@@ -92,10 +92,15 @@ router.post(
  */
 router.post(
   '/:eventId/upload',
-  // Extend request timeout for this specific route (15 minutes)
+  // Extend request timeout for this specific route (30 minutes)
   (req, res, next) => {
-    req.setTimeout(15 * 60 * 1000); // 15 minutes
-    res.setTimeout(15 * 60 * 1000); // 15 minutes
+    req.setTimeout(30 * 60 * 1000); // 30 minutes for large uploads without chunking
+    res.setTimeout(30 * 60 * 1000); // 30 minutes
+    // Cloudflare timeout prevention headers
+    // CF-Request-Timeout tells Cloudflare to wait longer (Enterprise only, but doesn't hurt)
+    // X-Accel-Buffering: no - prevents buffering in reverse proxies
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.setHeader('CF-Cache-Status', 'BYPASS');
     next();
   },
   authenticateToken,
@@ -124,10 +129,13 @@ router.post(
  */
 router.post(
   '/:eventId/upload-stream',
-  // Extend request timeout for streaming uploads (15 minutes)
+  // Extend request timeout for streaming uploads (30 minutes)
   (req, res, next) => {
-    req.setTimeout(15 * 60 * 1000);
-    res.setTimeout(15 * 60 * 1000);
+    req.setTimeout(30 * 60 * 1000); // 30 minutes for large uploads without chunking
+    res.setTimeout(30 * 60 * 1000); // 30 minutes
+    // Cloudflare timeout prevention headers
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.setHeader('CF-Cache-Status', 'BYPASS');
     next();
   },
   authenticateToken,

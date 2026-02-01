@@ -7,7 +7,7 @@ export function uploadFormDataWithProgress(
   formData: FormData,
   onProgress?: UploadProgressHandler,
   method: 'POST' | 'PATCH' | 'PUT' = 'POST',
-  timeoutMs: number = 15 * 60 * 1000 // 15 minutes default timeout
+  timeoutMs: number = 30 * 60 * 1000 // 30 minutes default timeout for large uploads
 ): Promise<Response> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
