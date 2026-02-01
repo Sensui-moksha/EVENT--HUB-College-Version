@@ -1336,7 +1336,15 @@ const CreateEvent: React.FC = () => {
                     <button
                       type="button"
                       title="Toggle other college registrations"
-                      onClick={() => setAllowOtherColleges(!allowOtherColleges)}
+                      onClick={() => {
+                        const newValue = !allowOtherColleges;
+                        setAllowOtherColleges(newValue);
+                        if (newValue) {
+                          // When enabling other college registrations, auto-enable notify all users and make visible (turn off hide)
+                          setNotifyAllUsers(true);
+                          setVisibleToOthers(false); // false = visible to all, true = hidden
+                        }
+                      }}
                       className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
                         allowOtherColleges ? 'bg-purple-500' : 'bg-gray-300'
                       }`}
@@ -1403,25 +1411,32 @@ const CreateEvent: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Toggle 3: Visible to Other Colleges */}
+                {/* Toggle 3: Hide from Other Colleges */}
                 <div className="border-t border-gray-200 pt-6">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <Eye className="w-5 h-5 text-green-500" />
-                        <h3 className="text-lg font-semibold text-gray-900">Visible to Other Colleges</h3>
+                        <h3 className="text-lg font-semibold text-gray-900">Hide from Other Colleges</h3>
                       </div>
                       <p className="text-sm text-gray-600">
                         {visibleToOthers
-                          ? 'Students from other colleges can see this event in their feed.'
-                          : 'This event is hidden from students of other colleges.'}
+                          ? 'This event is hidden from students of other colleges.'
+                          : <>All users can see this event, but only <strong>{COLLEGE_NAME}</strong> students can register (if registration is restricted).</>}
                       </p>
                     </div>
                     <div className="ml-4">
                       <button
                         type="button"
-                        title="Toggle visibility to other colleges"
-                        onClick={() => setVisibleToOthers(!visibleToOthers)}
+                        title="Toggle hide from other colleges"
+                        onClick={() => {
+                          const newValue = !visibleToOthers;
+                          setVisibleToOthers(newValue);
+                          // If hiding from other colleges when other college registrations is on, also turn off other college registrations
+                          if (newValue && allowOtherColleges) {
+                            setAllowOtherColleges(false);
+                          }
+                        }}
                         className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
                           visibleToOthers ? 'bg-green-500' : 'bg-gray-300'
                         }`}
@@ -1437,11 +1452,11 @@ const CreateEvent: React.FC = () => {
                   </div>
                   <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
                     <p className="text-sm text-green-800">
-                      <strong>{visibleToOthers ? '👁️ Publicly Visible' : '🙈 Hidden'}</strong>
+                      <strong>{visibleToOthers ? '🙈 Hidden from Others' : '👁️ Visible to All'}</strong>
                       <br />
                       {visibleToOthers 
-                        ? "Students from all colleges can see this event (they may not be able to register if restricted)."
-                        : "Only students from your college can see this event in their feed."}
+                        ? "Only students from your college can see this event in their feed."
+                        : "All users can view this event. Registration depends on 'Other College Registrations' setting."}
                     </p>
                   </div>
                 </div>
