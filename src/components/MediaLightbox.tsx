@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -16,6 +16,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
+import { API_BASE_URL } from '../utils/api';
 
 interface MediaItem {
   _id: string;
@@ -75,8 +76,16 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, initialInde
 
   const current = media[currentIndex];
 
+  // Helper function to get full media URL (handles both relative and absolute URLs)
+  const getMediaUrl = useCallback((url: string) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+      return url;
+    }
+    return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+  }, []);
+
   // ==================== Network Resilience ====================
-  // Monitor online/offline status
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
@@ -447,7 +456,7 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, initialInde
 
   const handleDownload = () => {
     const link = document.createElement('a');
-    link.href = current.publicUrl;
+    link.href = getMediaUrl(current.publicUrl);
     link.download = current.fileName;
     link.click();
   };
@@ -466,7 +475,7 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, initialInde
             className="relative w-full h-full flex items-center justify-center px-2 sm:px-4"
           >
             <img
-              src={current.publicUrl}
+              src={getMediaUrl(current.publicUrl)}
               alt={current.fileName}
               className="max-h-[70vh] sm:max-h-[80vh] md:max-h-[85vh] max-w-[95vw] sm:max-w-[90vw] w-auto h-auto object-contain rounded-lg shadow-2xl transition-transform duration-300"
               style={{ transform: `scale(${zoomLevel})` }}
@@ -513,7 +522,9 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, initialInde
             onMouseLeave={() => isPlaying && setShowControls(false)}
           >
             <video
+              key={current._id}
               ref={videoRef}
+              src={getMediaUrl(current.publicUrl)}
               className="max-h-[65vh] sm:max-h-[75vh] md:max-h-[80vh] max-w-[95vw] sm:max-w-[90vw] w-auto h-auto rounded-lg shadow-2xl bg-black"
               onClick={() => current.type === 'video' && togglePlayPause()}
               onTouchStart={() => {
@@ -576,11 +587,7 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, initialInde
               playsInline
               preload="auto"
               crossOrigin="anonymous"
-            >
-              <source src={current.publicUrl} type="video/mp4" />
-              <source src={current.publicUrl} type="video/webm" />
-              Your browser does not support the video tag.
-            </video>
+            />
 
             {/* Buffering Indicator */}
             {isBuffering && (
@@ -785,7 +792,7 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, initialInde
           >
             <audio
               ref={audioRef}
-              src={current.publicUrl}
+              src={getMediaUrl(current.publicUrl)}
               onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
               onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
               onPlay={() => setIsPlaying(true)}
@@ -902,10 +909,10 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, initialInde
                 <p className="text-white/60 mb-6">{current.fileName}</p>
                 <div className="bg-black/30 rounded-lg p-12 mb-6">
                   <p className="text-white/40">3D model viewer coming soon...</p>
-                  <p className="text-sm text-white/30 mt-2">File: {current.publicUrl}</p>
+                  <p className="text-sm text-white/30 mt-2">File: {current.fileName}</p>
                 </div>
                 <a
-                  href={current.publicUrl}
+                  href={getMediaUrl(current.publicUrl)}
                   download={current.fileName}
                   className="inline-flex items-center gap-2 px-6 py-3 bg-violet-600 hover:bg-violet-700 rounded-lg transition-all"
                 >

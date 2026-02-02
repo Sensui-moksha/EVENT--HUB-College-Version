@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Trash2, ImageIcon, VideoIcon, CheckCircle, XCircle, Star } from 'lucide-react';
+import { API_BASE_URL } from '../utils/api';
 
 interface MediaItem {
   _id: string;
@@ -42,6 +43,15 @@ export const GalleryGrid: React.FC<GalleryGridProps> = ({
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
   const [draggedId, setDraggedId] = React.useState<string | null>(null);
   const [dragOverId, setDragOverId] = React.useState<string | null>(null);
+
+  // Helper function to get full media URL (handles both relative and absolute URLs)
+  const getMediaUrl = useCallback((url: string) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+      return url;
+    }
+    return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+  }, []);
 
   const handleDragStart = (_e: React.DragEvent, mediaId: string) => {
     setDraggedId(mediaId);
@@ -124,7 +134,7 @@ export const GalleryGrid: React.FC<GalleryGridProps> = ({
           {/* Image/Video thumbnail */}
           {item.type === 'image' ? (
             <img
-              src={item.thumbnailUrl || item.publicUrl}
+              src={getMediaUrl(item.thumbnailUrl || item.publicUrl)}
               alt={item.fileName}
               loading="lazy"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
@@ -132,7 +142,7 @@ export const GalleryGrid: React.FC<GalleryGridProps> = ({
           ) : (
             <div className="w-full h-full bg-slate-900 flex items-center justify-center relative">
               <video
-                src={item.publicUrl}
+                src={getMediaUrl(item.publicUrl)}
                 className="w-full h-full object-cover"
                 muted
                 preload="metadata"

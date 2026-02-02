@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { API_BASE_URL } from '../utils/api';
 
 interface MediaItem {
   _id: string;
@@ -28,6 +29,15 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
   const [isZoomed, setIsZoomed] = useState(false);
 
   const current = images[currentIndex];
+
+  // Helper function to get full media URL (handles both relative and absolute URLs)
+  const getMediaUrl = useCallback((url: string) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+      return url;
+    }
+    return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+  }, []);
 
   const handlePrevious = () => {
     setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
@@ -63,7 +73,7 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
       <div className="relative w-full h-full flex items-center justify-center p-4 sm:p-8 md:p-12">
         {current.type === 'image' ? (
           <img
-            src={current.publicUrl}
+            src={getMediaUrl(current.publicUrl)}
             alt={current.fileName}
             className={`max-h-[85vh] max-w-[90vw] w-auto h-auto object-contain cursor-zoom-in rounded-lg shadow-2xl ${
               isZoomed ? 'scale-150 cursor-zoom-out' : ''
@@ -73,7 +83,7 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
         ) : (
           <video
             key={current._id}
-            src={current.publicUrl}
+            src={getMediaUrl(current.publicUrl)}
             controls
             autoPlay
             playsInline
@@ -84,10 +94,7 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
               video.load();
             }}
             className="max-h-[85vh] max-w-[90vw] w-auto h-auto object-contain rounded-lg shadow-2xl bg-black"
-          >
-            <source src={current.publicUrl} type="video/mp4" />
-            Your browser does not support the video tag.
-          </video>
+          />
         )}
       </div>
 
@@ -136,7 +143,7 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
               }`}
             >
               <img
-                src={img.thumbnailUrl || img.publicUrl}
+                src={getMediaUrl(img.thumbnailUrl || img.publicUrl)}
                 alt=""
                 className="w-full h-full object-cover"
                 loading="lazy"

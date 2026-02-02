@@ -71,10 +71,24 @@ const isGalleryMedia = (url) => {
 
 // Helper to check if it's a video request
 const isVideoRequest = (url, contentType) => {
-  const videoExtensions = ['.mp4', '.mov', '.webm', '.avi', '.mkv', '.m4v'];
-  return url.pathname.includes('/api/gallery/media/') && 
-    (contentType?.includes('video') || 
-     videoExtensions.some(ext => url.pathname.toLowerCase().endsWith(ext)));
+  // Common video extensions
+  const videoExtensions = ['.mp4', '.mov', '.webm', '.avi', '.mkv', '.m4v', '.3gp', '.flv', '.wmv', '.ogv'];
+  const pathname = url.pathname.toLowerCase();
+  
+  // Check if it's a gallery media URL with video extension
+  if (url.pathname.includes('/api/gallery/media/')) {
+    // Check file extension in the URL
+    if (videoExtensions.some(ext => pathname.includes(ext))) {
+      return true;
+    }
+  }
+  
+  // Also check content-type header if available
+  if (contentType?.includes('video')) {
+    return true;
+  }
+  
+  return false;
 };
 
 // Helper to check if it's an image request
