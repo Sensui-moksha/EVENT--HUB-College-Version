@@ -93,70 +93,85 @@ export const serveMedia = async (req, res) => {
           const fileSize = fileInfo.length;
           const etag = `"${fileName}-${fileSize}"`;
           
-          // For videos, always handle range requests for smooth playback
+          // For videos, handle range requests for smooth playback
           if (isVideo) {
             // Set video cache headers
             httpCacheHeaders.forVideo(res, etag);
             
-            // Default chunk size for video buffering (2MB chunks for smooth ahead-loading)
-            const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB - optimal for streaming
-            
-            let start = 0;
-            let end = fileSize - 1;
-            
-            if (range) {
-              // Parse range header: "bytes=start-end"
-              const parts = range.replace(/bytes=/, '').split('-');
-              start = parseInt(parts[0], 10);
-              // If end is not specified, serve a chunk (enables ahead-loading)
-              end = parts[1] ? parseInt(parts[1], 10) : Math.min(start + CHUNK_SIZE - 1, fileSize - 1);
-            } else {
-              // No range requested - serve first chunk to start buffering quickly
-              end = Math.min(CHUNK_SIZE - 1, fileSize - 1);
-            }
-            
-            // Ensure valid range
-            start = Math.max(0, start);
-            end = Math.min(end, fileSize - 1);
-            const contentLength = end - start + 1;
-            
-            // Stream the requested range
-            const streamData = await streamWithRange(fileName, { start, end });
-            
-            // HTTP 206 Partial Content for range requests (enables seeking & buffering)
-            res.status(206);
-            res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
-            res.setHeader('Accept-Ranges', 'bytes');
-            res.setHeader('Content-Length', contentLength);
-            res.setHeader('Content-Type', media.mimeType);
-            
-            // ETag for this specific range
-            res.setHeader('ETag', `"${fileName}-${start}-${end}"`);
-            res.setHeader('X-Storage', 'GridFS');
-            res.setHeader('X-Content-Duration', media.duration || '');
-            res.setHeader('X-Cache', 'STREAM');
-            
             // CORS headers for video players
             res.setHeader('Access-Control-Allow-Origin', '*');
             res.setHeader('Access-Control-Allow-Headers', 'Range');
-            res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, X-Cache');
+            res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, X-Cache, X-Total-Size');
+            res.setHeader('Accept-Ranges', 'bytes');
+            res.setHeader('Content-Type', media.mimeType);
+            res.setHeader('X-Storage', 'GridFS');
+            res.setHeader('X-Content-Duration', media.duration || '');
+            res.setHeader('X-Total-Size', fileSize);
             
             // CDN caching hints
             res.setHeader('CDN-Cache-Control', 'public, max-age=2592000');
             res.setHeader('Cloudflare-CDN-Cache-Control', 'public, max-age=2592000');
             
-            // Timing headers for debugging
-            res.setHeader('X-Chunk-Size', CHUNK_SIZE);
-            res.setHeader('X-Served-Range', `${start}-${end}`);
+            // If Range header is provided, serve partial content (206)
+            if (range) {
+              // Parse range header: "bytes=start-end" or "bytes=start-"
+              const parts = range.replace(/bytes=/, '').split('-');
+              let start = parseInt(parts[0], 10) || 0;
+              // If end is not specified (open-ended range like "bytes=0-"), serve to end of file
+              // This is critical for proper video playback - browser expects full remaining content
+              let end = parts[1] && parts[1].length > 0 ? parseInt(parts[1], 10) : fileSize - 1;
+              
+              // Ensure valid range
+              start = Math.max(0, start);
+              end = Math.min(end, fileSize - 1);
+              
+              // Validate range
+              if (start > end || start >= fileSize) {
+                res.status(416); // Range Not Satisfiable
+                res.setHeader('Content-Range', `bytes */${fileSize}`);
+                return res.end();
+              }
+              
+              const contentLength = end - start + 1;
+              
+              // Stream the requested range
+              const streamData = await streamWithRange(fileName, { start, end });
+              
+              // HTTP 206 Partial Content
+              res.status(206);
+              res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+              res.setHeader('Content-Length', contentLength);
+              res.setHeader('ETag', `"${fileName}-${fileSize}"`);
+              res.setHeader('X-Cache', 'STREAM-RANGE');
+              res.setHeader('X-Served-Range', `${start}-${end}`);
+              
+              streamData.stream.on('error', (err) => {
+                console.error('Video stream error:', err);
+                if (!res.headersSent) {
+                  res.status(500).json({ error: 'Failed to stream video' });
+                }
+              });
+              
+              streamData.stream.pipe(res);
+              return;
+            }
             
-            streamData.stream.on('error', (err) => {
-              console.error('Video stream error:', err);
+            // No Range header - serve the ENTIRE video file (HTTP 200)
+            // This ensures the browser knows the full video duration
+            res.status(200);
+            res.setHeader('Content-Length', fileSize);
+            res.setHeader('ETag', etag);
+            res.setHeader('X-Cache', 'STREAM-FULL');
+            
+            const downloadStream = downloadFromGridFS(fileName);
+            downloadStream.on('error', (err) => {
+              console.error('Video full stream error:', err);
               if (!res.headersSent) {
                 res.status(500).json({ error: 'Failed to stream video' });
               }
             });
             
-            streamData.stream.pipe(res);
+            downloadStream.pipe(res);
             return;
           }
           
@@ -213,43 +228,54 @@ export const serveMedia = async (req, res) => {
 
     const fileSize = cachedBuffer.length;
     
-    // Handle video streaming with chunked responses for smooth playback
+    // Handle video streaming - support range requests for seeking
     if (isVideo) {
-      const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB chunks
-      
-      let start = 0;
-      let end = fileSize - 1;
-      
-      if (range) {
-        const parts = range.replace(/bytes=/, '').split('-');
-        start = parseInt(parts[0], 10);
-        end = parts[1] ? parseInt(parts[1], 10) : Math.min(start + CHUNK_SIZE - 1, fileSize - 1);
-      } else {
-        // No range - serve first chunk for quick start
-        end = Math.min(CHUNK_SIZE - 1, fileSize - 1);
-      }
-      
-      // Ensure valid range
-      start = Math.max(0, start);
-      end = Math.min(end, fileSize - 1);
-      const contentLength = end - start + 1;
-      
-      const chunk = cachedBuffer.slice(start, end + 1);
-      
-      res.status(206); // Partial Content
-      res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
-      res.setHeader('Accept-Ranges', 'bytes');
-      res.setHeader('Content-Length', contentLength);
-      res.setHeader('Content-Type', media.mimeType);
-      res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
-      res.setHeader('ETag', `"${fileName}-${start}-${end}"`);
-      
       // CORS headers for video players
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Headers', 'Range');
-      res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, X-Total-Size');
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Content-Type', media.mimeType);
+      res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+      res.setHeader('X-Total-Size', fileSize);
       
-      return res.send(chunk);
+      // If Range header is provided, serve partial content (206)
+      if (range) {
+        // Parse range header: "bytes=start-end" or "bytes=start-"
+        const parts = range.replace(/bytes=/, '').split('-');
+        let start = parseInt(parts[0], 10) || 0;
+        // If end is not specified (open-ended range), serve to end of file
+        let end = parts[1] && parts[1].length > 0 ? parseInt(parts[1], 10) : fileSize - 1;
+        
+        // Ensure valid range
+        start = Math.max(0, start);
+        end = Math.min(end, fileSize - 1);
+        
+        // Validate range
+        if (start > end || start >= fileSize) {
+          res.status(416); // Range Not Satisfiable
+          res.setHeader('Content-Range', `bytes */${fileSize}`);
+          return res.end();
+        }
+        
+        const contentLength = end - start + 1;
+        const chunk = cachedBuffer.slice(start, end + 1);
+        
+        res.status(206); // Partial Content
+        res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+        res.setHeader('Content-Length', contentLength);
+        res.setHeader('ETag', `"${fileName}-${fileSize}"`);
+        
+        return res.send(chunk);
+      }
+      
+      // No Range header - serve the ENTIRE video file (HTTP 200)
+      // This ensures the browser knows the full video duration
+      res.status(200);
+      res.setHeader('Content-Length', fileSize);
+      res.setHeader('ETag', `"${fileName}"`);
+      
+      return res.send(cachedBuffer);
     }
 
     // Set response headers for full file (images)
