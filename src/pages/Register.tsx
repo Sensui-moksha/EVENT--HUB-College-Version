@@ -7,13 +7,12 @@ import { useToast } from '../components/ui/Toast';
 import { pageVariants, fadeInVariants } from '../utils/animations';
 import { Eye, EyeOff } from 'lucide-react';
 import EmailVerificationModal from '../components/EmailVerificationModal';
+import { DEFAULT_COLLEGE } from '../config/college';
 
 const Register: React.FC = () => {
   const currentYear = new Date().getFullYear();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
-
-  const DEFAULT_COLLEGE = 'DVR & Dr. HS MIC College of Technology';
   const [formData, setFormData] = useState({
     name: '',
     email: '',

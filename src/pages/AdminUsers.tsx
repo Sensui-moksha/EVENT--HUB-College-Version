@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast';
+import { DEFAULT_COLLEGE } from '../config/college';
 import {
   User as UserIcon,
   Mail as MailIcon,
@@ -590,27 +591,37 @@ const AdminUsers: React.FC = () => {
     filteredUsers = users;
   }
 
-  // Get admin's college (use empty string if not set to group all users without college together)
-  const adminCollege = user?.college || '';
+  // Get admin's college (use DEFAULT_COLLEGE if not set)
+  const adminCollege = user?.college || DEFAULT_COLLEGE;
+  
+  // Helper function to normalize college name for comparison
+  const normalizeCollege = (college: string): string => {
+    return college.toLowerCase().trim().replace(/\s+/g, ' ');
+  };
+  
+  // Check if a college matches our college (handles variations)
+  const isMyCollege = (college: string): boolean => {
+    if (!college) return false;
+    const normalizedAdmin = normalizeCollege(adminCollege);
+    const normalizedUser = normalizeCollege(college);
+    const normalizedDefault = normalizeCollege(DEFAULT_COLLEGE);
+    
+    // Match if exactly same as admin's college or default college
+    return normalizedUser === normalizedAdmin || normalizedUser === normalizedDefault;
+  };
   
   // Separate users into "My College" and "Other Colleges"
   const myCollegeUsers = filteredUsers.filter(u => {
     const userCollege = u.college || '';
-    // Users belong to "My College" if:
-    // 1. Admin has no college set and user has no college set, OR
-    // 2. Both admin and user have the same college (case insensitive)
-    if (!adminCollege && !userCollege) return true;
-    return adminCollege.toLowerCase() === userCollege.toLowerCase();
+    // Users belong to "My College" if their college matches admin's college or DEFAULT_COLLEGE
+    return isMyCollege(userCollege);
   });
   
   const otherCollegeUsers = filteredUsers.filter(u => {
     const userCollege = u.college || '';
-    // Users belong to "Other Colleges" if:
-    // 1. Admin has a college set but user has a different college, OR
-    // 2. Admin has no college but user has a college set
-    if (!adminCollege && userCollege) return true;
-    if (adminCollege && userCollege && adminCollege.toLowerCase() !== userCollege.toLowerCase()) return true;
-    return false;
+    // Users belong to "Other Colleges" if they have a college set but it doesn't match
+    if (!userCollege) return false; // Users without college go to "My College"
+    return !isMyCollege(userCollege);
   });
 
   // Filter pending users based on search query (same logic)

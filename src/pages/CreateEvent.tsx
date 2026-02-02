@@ -27,6 +27,8 @@ import TimePicker from '../components/TimePicker';
 import { AccessControl } from '../types/subEvent';
 import { uploadFormDataWithProgress } from '../utils/upload';
 import { API_BASE_URL } from '../utils/api';
+import { DEFAULT_COLLEGE } from '../config/college';
+import { DEFAULT_COLLEGE } from '../config/college';
 
 // Helper function to get full image URL for relative paths
 const getFullImageUrl = (url: string): string => {
@@ -129,7 +131,7 @@ const CreateEvent: React.FC = () => {
   );
 
   // College-specific settings
-  const COLLEGE_NAME = "DVR & Dr. HS MIC College of Technology";
+  const COLLEGE_NAME = DEFAULT_COLLEGE;
   // allowOtherColleges: OFF = only college students can register (default), ON = anyone can register
   const [allowOtherColleges, setAllowOtherColleges] = useState<boolean>(
     (editingEvent as any)?.allowOtherColleges ?? false

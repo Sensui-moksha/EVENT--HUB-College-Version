@@ -14,6 +14,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { pageVariants } from '../utils/animations';
+import { COLLEGE_CONFIG } from '../config/college';
 
 const Home: React.FC = () => {
   const { user } = useAuth();
@@ -149,7 +150,7 @@ const Home: React.FC = () => {
               <div className="bg-[#eaeaea] backdrop-blur-sm rounded-2xl p-3 sm:p-4 border border-gray-300 shadow-2xl hover:bg-[#e0e0e0] transition-all duration-300">
                 <img 
                   src="/logo-mic.png" 
-                  alt="MIC College of Technology" 
+                  alt={COLLEGE_CONFIG.logoAlt} 
                   className="h-12 sm:h-16 lg:h-20 w-auto object-contain mx-auto max-w-sm sm:max-w-md lg:max-w-lg"
                 />
               </div>

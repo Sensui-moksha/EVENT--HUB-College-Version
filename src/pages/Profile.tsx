@@ -724,6 +724,10 @@ const Profile: React.FC = () => {
                       <p className="text-lg text-gray-900">{user.email}</p>
                     </div>
                     <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">College</label>
+                      <p className="text-lg text-gray-900">{user.college || 'Not specified'}</p>
+                    </div>
+                    <div>
                       <label className="block text-sm font-medium text-gray-500 mb-1">{user.role === 'faculty' ? 'Room No' : 'Section'}</label>
                       <p className="text-lg text-gray-900">{user.role === 'faculty' ? ((user as any).roomNo || 'Not specified') : (user.section || 'Not specified')}</p>
                     </div>
