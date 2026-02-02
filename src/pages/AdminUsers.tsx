@@ -10,7 +10,12 @@ import {
   Briefcase,
   X,
   Clock,
-  ChevronDown
+  ChevronDown,
+  Building2,
+  Users,
+  Trash2,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 
 interface User {
@@ -80,6 +85,13 @@ const AdminUsers: React.FC = () => {
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Tab state for My College / Other Colleges
+  const [activeTab, setActiveTab] = useState<'myCollege' | 'otherColleges'>('myCollege');
+  
+  // Bulk delete state for other colleges
+  const [selectedOtherCollegeUsers, setSelectedOtherCollegeUsers] = useState<string[]>([]);
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
   
   // Registration approval settings
   const [requireApproval, setRequireApproval] = useState(false);
@@ -278,6 +290,65 @@ const AdminUsers: React.FC = () => {
       }
     } catch (_error) {
       showToast('Failed to bulk approve', 'error');
+    }
+  };
+
+  // Bulk delete other college users
+  const handleBulkDeleteOtherCollegeUsers = async () => {
+    if (!user) return;
+    if (selectedOtherCollegeUsers.length === 0) {
+      showToast('No users selected for deletion', 'error');
+      return;
+    }
+    
+    if (!confirm(`Are you sure you want to delete ${selectedOtherCollegeUsers.length} user(s) from other colleges? This action cannot be undone.`)) {
+      return;
+    }
+    
+    setBulkDeleteLoading(true);
+    try {
+      const response = await fetch('/api/admin/users/bulk-delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          userIds: selectedOtherCollegeUsers, 
+          adminId: user._id || user.id 
+        })
+      });
+      const data = await response.json();
+      
+      if (response.ok) {
+        showToast(`Successfully deleted ${data.deletedCount} user(s)`, 'success');
+        setSelectedOtherCollegeUsers([]);
+        fetchUsers();
+      } else {
+        showToast(data.error || 'Failed to delete users', 'error');
+      }
+    } catch (_error) {
+      showToast('Failed to delete users', 'error');
+    } finally {
+      setBulkDeleteLoading(false);
+    }
+  };
+
+  // Toggle single user selection for bulk delete
+  const toggleUserSelection = (userId: string) => {
+    setSelectedOtherCollegeUsers(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  // Select/Deselect all other college users
+  const toggleSelectAllOtherCollegeUsers = (otherCollegeUsers: User[]) => {
+    const allIds = otherCollegeUsers.map(u => u._id);
+    const allSelected = allIds.every(id => selectedOtherCollegeUsers.includes(id));
+    
+    if (allSelected) {
+      setSelectedOtherCollegeUsers([]);
+    } else {
+      setSelectedOtherCollegeUsers(allIds);
     }
   };
 
@@ -511,12 +582,36 @@ const AdminUsers: React.FC = () => {
       filteredUsers = users.filter(user =>
         user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.department.toLowerCase().includes(searchQuery.toLowerCase())
+        user.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (user.college && user.college.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
   } else {
     filteredUsers = users;
   }
+
+  // Get admin's college (use empty string if not set to group all users without college together)
+  const adminCollege = user?.college || '';
+  
+  // Separate users into "My College" and "Other Colleges"
+  const myCollegeUsers = filteredUsers.filter(u => {
+    const userCollege = u.college || '';
+    // Users belong to "My College" if:
+    // 1. Admin has no college set and user has no college set, OR
+    // 2. Both admin and user have the same college (case insensitive)
+    if (!adminCollege && !userCollege) return true;
+    return adminCollege.toLowerCase() === userCollege.toLowerCase();
+  });
+  
+  const otherCollegeUsers = filteredUsers.filter(u => {
+    const userCollege = u.college || '';
+    // Users belong to "Other Colleges" if:
+    // 1. Admin has a college set but user has a different college, OR
+    // 2. Admin has no college but user has a college set
+    if (!adminCollege && userCollege) return true;
+    if (adminCollege && userCollege && adminCollege.toLowerCase() !== userCollege.toLowerCase()) return true;
+    return false;
+  });
 
   // Filter pending users based on search query (same logic)
   let filteredPendingUsers: User[] = [];
@@ -557,7 +652,7 @@ const AdminUsers: React.FC = () => {
 
   return (
     <motion.div 
-      className="min-h-screen bg-gray-50 pt-16 sm:pt-20 py-4 sm:py-8 px-3 sm:px-4 md:px-6 lg:px-8"
+      className="min-h-screen bg-gray-50 pt-16 sm:pt-20 pb-20 sm:pb-8 py-4 sm:py-8 px-2 sm:px-4 md:px-6 lg:px-8"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -565,18 +660,19 @@ const AdminUsers: React.FC = () => {
     >
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-4 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">User Management</h1>
-          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
-            Manage all users in the system. Total: {users.length} users
+        <div className="mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">User Management</h1>
+          <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-gray-600">
+            Manage all users in the system. Total: {users.length} users 
+            {adminCollege && <span className="ml-1">• Your College: <span className="font-medium">{adminCollege}</span></span>}
           </p>
         </div>
 
         {/* Registration Approval Settings */}
-        <div className="mb-4 sm:mb-6 bg-white shadow rounded-lg p-4 sm:p-6">
+        <div className="mb-4 sm:mb-6 bg-white shadow rounded-lg p-3 sm:p-4 md:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h2 className="text-base sm:text-lg font-semibold text-gray-900">Registration Approval</h2>
+              <h2 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900">Registration Approval</h2>
               <p className="text-xs sm:text-sm text-gray-600">
                 When enabled, new registrations require admin approval.
               </p>
@@ -584,7 +680,7 @@ const AdminUsers: React.FC = () => {
             <button
               onClick={toggleApprovalSetting}
               disabled={loadingApproval}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                 requireApproval ? 'bg-blue-600' : 'bg-gray-200'
               } ${loadingApproval ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
@@ -596,7 +692,7 @@ const AdminUsers: React.FC = () => {
             </button>
           </div>
           <div className="mt-2">
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
               requireApproval ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
             }`}>
               {requireApproval ? 'Manual Approval Required' : 'Auto-Approve New Users'}
@@ -616,7 +712,7 @@ const AdminUsers: React.FC = () => {
                   <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" />
                 </div>
                 <div>
-                  <h2 className="text-sm sm:text-lg font-semibold text-yellow-800">Pending Users</h2>
+                  <h2 className="text-sm sm:text-base md:text-lg font-semibold text-yellow-800">Pending Users</h2>
                   <p className="text-xs sm:text-sm text-yellow-600">
                     {searchQuery.trim() !== '' 
                       ? `${filteredPendingUsers.length} of ${pendingUsers.length} matching`
@@ -729,83 +825,172 @@ const AdminUsers: React.FC = () => {
           </div>
           <button
             onClick={() => setShowCreateForm(true)}
-            className="px-4 sm:px-6 py-2 bg-blue-600 text-white text-sm sm:text-base rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
+            className="px-3 sm:px-6 py-2 bg-blue-600 text-white text-xs sm:text-sm rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap flex-shrink-0"
           >
-            + New User
+            <span className="hidden sm:inline">+ New User</span>
+            <span className="sm:hidden">+ Add</span>
           </button>
         </div>
 
-        {/* Users Table */}
+        {/* Tabs for My College / Other Colleges */}
+        <div className="mb-4 sm:mb-6">
+          <div className="flex flex-wrap gap-2 p-1 bg-gray-100 rounded-lg">
+            <button
+              onClick={() => {
+                setActiveTab('myCollege');
+                setSelectedOtherCollegeUsers([]);
+              }}
+              className={`flex-1 min-w-[120px] sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium rounded-md transition-all ${
+                activeTab === 'myCollege'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline">My College</span>
+              <span className="xs:hidden">Mine</span>
+              <span className={`ml-1 px-1.5 sm:px-2 py-0.5 text-xs rounded-full ${
+                activeTab === 'myCollege' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'
+              }`}>
+                {myCollegeUsers.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('otherColleges')}
+              className={`flex-1 min-w-[120px] sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium rounded-md transition-all ${
+                activeTab === 'otherColleges'
+                  ? 'bg-white text-purple-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline">Other Colleges</span>
+              <span className="xs:hidden">Others</span>
+              <span className={`ml-1 px-1.5 sm:px-2 py-0.5 text-xs rounded-full ${
+                activeTab === 'otherColleges' ? 'bg-purple-100 text-purple-700' : 'bg-gray-200 text-gray-600'
+              }`}>
+                {otherCollegeUsers.length}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Bulk Delete Controls for Other Colleges */}
+        {activeTab === 'otherColleges' && otherCollegeUsers.length > 0 && (
+          <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <button
+                  onClick={() => toggleSelectAllOtherCollegeUsers(otherCollegeUsers)}
+                  className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-gray-700 hover:text-gray-900"
+                >
+                  {otherCollegeUsers.length > 0 && otherCollegeUsers.every(u => selectedOtherCollegeUsers.includes(u._id)) ? (
+                    <CheckSquare className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
+                  ) : (
+                    <Square className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+                  )}
+                  <span className="hidden sm:inline">Select All</span>
+                  <span className="sm:hidden">All</span>
+                </button>
+                {selectedOtherCollegeUsers.length > 0 && (
+                  <span className="text-xs sm:text-sm text-red-600 font-medium">
+                    {selectedOtherCollegeUsers.length} selected
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={handleBulkDeleteOtherCollegeUsers}
+                disabled={selectedOtherCollegeUsers.length === 0 || bulkDeleteLoading}
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-colors ${
+                  selectedOtherCollegeUsers.length === 0 || bulkDeleteLoading
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-red-600 text-white hover:bg-red-700'
+                }`}
+              >
+                {bulkDeleteLoading ? (
+                  <>
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Delete Selected</span>
+                    <span className="sm:hidden">Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Users Table - My College */}
+        {activeTab === 'myCollege' && (
         <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="table-responsive">
+          <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     User
                   </th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
                     Contact
                   </th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
+                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
                     Academic Details
                   </th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Role
                   </th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredUsers.map((userData) => (
+                {myCollegeUsers.map((userData) => (
                   <tr key={userData._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
-                            <span className="text-white font-medium">
+                        <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10">
+                          <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-blue-500 flex items-center justify-center">
+                            <span className="text-white text-xs sm:text-base font-medium">
                               {userData.name.charAt(0).toUpperCase()}
                             </span>
                           </div>
                         </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
+                        <div className="ml-2 sm:ml-4 min-w-0">
+                          <div className="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[80px] sm:max-w-[150px] md:max-w-none">
                             {userData.name}
                           </div>
-                          <div className="text-sm text-gray-500">
+                          <div className="text-xs text-gray-500 truncate max-w-[80px] sm:max-w-[150px] md:max-w-none">
                             ID: {userData.regId}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{userData.email}</div>
-                      <div className="text-sm text-gray-500">{userData.mobile}</div>
+                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap hidden sm:table-cell">
+                      <div className="text-xs sm:text-sm text-gray-900 truncate max-w-[120px] md:max-w-[200px]">{userData.email}</div>
+                      <div className="text-xs text-gray-500">{userData.mobile}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap hidden lg:table-cell">
                       <div className="text-sm text-gray-900">{userData.department}</div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-xs text-gray-500">
                         {userData.role === 'faculty' ? (
                           <>
                             Room: {(userData as any).roomNo || '-'}
                           </>
                         ) : (
                           <>
-                            {userData.section} - {userData.year}
+                            {userData.section} - Year {userData.year}
                           </>
                         )}
                       </div>
-                      {userData.college && (
-                        <div className="text-sm text-gray-500 mt-1">
-                          College: {userData.college}
-                        </div>
-                      )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap">
                       <div className="flex flex-col gap-1">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        <span className={`inline-flex px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold rounded-full ${
                           userData.role === 'admin' 
                             ? 'bg-purple-100 text-purple-800'
                             : userData.role === 'organizer'
@@ -817,37 +1002,39 @@ const AdminUsers: React.FC = () => {
                           {userData.role}
                         </span>
                         {userData.accountStatus === 'pending' && (
-                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                          <span className="inline-flex px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
                             Pending
                           </span>
                         )}
                         {userData.accountStatus === 'rejected' && (
-                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                          <span className="inline-flex px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
                             Rejected
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
+                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium">
+                      <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
                         <button
                           onClick={() => openEditForm(userData)}
-                          className="text-blue-600 hover:text-blue-900"
+                          className="text-blue-600 hover:text-blue-900 text-xs sm:text-sm"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => openPasswordForm(userData)}
-                          className="text-yellow-600 hover:text-yellow-900"
+                          className="text-yellow-600 hover:text-yellow-900 text-xs sm:text-sm"
                         >
-                          Password
+                          <span className="hidden sm:inline">Password</span>
+                          <span className="sm:hidden">Pass</span>
                         </button>
                         {userData._id !== user._id && (
                           <button
                             onClick={() => handleDeleteUser(userData._id, userData.name)}
-                            className="text-red-600 hover:text-red-900"
+                            className="text-red-600 hover:text-red-900 text-xs sm:text-sm"
                           >
-                            Delete
+                            <span className="hidden sm:inline">Delete</span>
+                            <span className="sm:hidden">Del</span>
                           </button>
                         )}
                       </div>
@@ -858,14 +1045,134 @@ const AdminUsers: React.FC = () => {
             </table>
           </div>
           
-          {filteredUsers.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-gray-500">
-                {searchQuery ? 'No users found matching your search.' : 'No users found.'}
+          {myCollegeUsers.length === 0 && (
+            <div className="text-center py-6 sm:py-8">
+              <Building2 className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 text-sm sm:text-base">
+                {searchQuery ? 'No users found matching your search.' : 'No users from your college found.'}
               </p>
             </div>
           )}
         </div>
+        )}
+
+        {/* Users Table - Other Colleges */}
+        {activeTab === 'otherColleges' && (
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-purple-50">
+                <tr>
+                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider w-8 sm:w-12">
+                    <span className="sr-only">Select</span>
+                  </th>
+                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">
+                    User
+                  </th>
+                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider hidden sm:table-cell">
+                    College
+                  </th>
+                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider hidden md:table-cell">
+                    Contact
+                  </th>
+                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">
+                    Role
+                  </th>
+                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {otherCollegeUsers.map((userData) => (
+                  <tr key={userData._id} className={`hover:bg-gray-50 ${selectedOtherCollegeUsers.includes(userData._id) ? 'bg-red-50' : ''}`}>
+                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => toggleUserSelection(userData._id)}
+                        className="p-1"
+                      >
+                        {selectedOtherCollegeUsers.includes(userData._id) ? (
+                          <CheckSquare className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
+                        ) : (
+                          <Square className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 hover:text-gray-600" />
+                        )}
+                      </button>
+                    </td>
+                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10">
+                          <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-purple-500 flex items-center justify-center">
+                            <span className="text-white text-xs sm:text-base font-medium">
+                              {userData.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="ml-2 sm:ml-4 min-w-0">
+                          <div className="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[60px] sm:max-w-[100px] md:max-w-[150px]">
+                            {userData.name}
+                          </div>
+                          <div className="text-xs text-gray-500 truncate max-w-[60px] sm:max-w-[100px] md:max-w-[150px]">
+                            ID: {userData.regId}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap hidden sm:table-cell">
+                      <div className="text-xs sm:text-sm text-purple-700 font-medium truncate max-w-[100px] md:max-w-[150px]">
+                        {userData.college || 'Not specified'}
+                      </div>
+                      <div className="text-xs text-gray-500">{userData.department}</div>
+                    </td>
+                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap hidden md:table-cell">
+                      <div className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px]">{userData.email}</div>
+                      <div className="text-xs text-gray-500">{userData.mobile}</div>
+                    </td>
+                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold rounded-full ${
+                        userData.role === 'admin' 
+                          ? 'bg-purple-100 text-purple-800'
+                          : userData.role === 'organizer'
+                          ? 'bg-blue-100 text-blue-800'
+                          : userData.role === 'faculty'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-green-100 text-green-800'
+                      }`}>
+                        {userData.role}
+                      </span>
+                    </td>
+                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium">
+                      <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
+                        <button
+                          onClick={() => openEditForm(userData)}
+                          className="text-blue-600 hover:text-blue-900 text-xs sm:text-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(userData._id, userData.name)}
+                          className="text-red-600 hover:text-red-900 text-xs sm:text-sm"
+                        >
+                          <span className="hidden sm:inline">Delete</span>
+                          <span className="sm:hidden">Del</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          {otherCollegeUsers.length === 0 && (
+            <div className="text-center py-6 sm:py-8">
+              <Users className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 text-sm sm:text-base">
+                {searchQuery ? 'No users from other colleges match your search.' : 'No users from other colleges found.'}
+              </p>
+            </div>
+          )}
+        </div>
+        )}
 
         {/* Create User Modal */}
         {showCreateForm && (

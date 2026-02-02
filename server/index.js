@@ -4690,6 +4690,49 @@ app.delete('/api/admin/user/:id', async (req, res) => {
   }
 });
 
+// Admin: Bulk delete users (for other college users)
+app.delete('/api/admin/users/bulk-delete', async (req, res) => {
+  try {
+    const { adminId, userIds } = req.body;
+    
+    // Verify admin
+    const admin = await User.findById(adminId);
+    if (!admin || admin.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required.' });
+    }
+    
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ error: 'No user IDs provided.' });
+    }
+    
+    // Prevent admin from deleting themselves
+    const filteredIds = userIds.filter(id => id !== adminId);
+    
+    // Delete users
+    const result = await User.deleteMany({ _id: { $in: filteredIds } });
+    
+    // Also delete their registrations
+    await Registration.deleteMany({ userId: { $in: filteredIds } });
+    
+    // Delete sub-event registrations
+    await SubEventRegistration.deleteMany({ userId: { $in: filteredIds } });
+    
+    // Delete waitlist entries
+    await SubEventWaitlist.deleteMany({ userId: { $in: filteredIds } });
+    
+    console.log(`🗑️ Admin ${admin.name} bulk deleted ${result.deletedCount} users`);
+    
+    res.json({ 
+      success: true, 
+      deletedCount: result.deletedCount,
+      message: `Successfully deleted ${result.deletedCount} users.`
+    });
+  } catch (err) {
+    console.error('Bulk delete users error:', err);
+    res.status(500).json({ error: 'Failed to delete users.' });
+  }
+});
+
 // ========== SYSTEM SETTINGS & USER APPROVAL ==========
 
 // Get system settings (admin only)
