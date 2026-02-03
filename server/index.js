@@ -3904,7 +3904,13 @@ app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    
+    // Specific error message if email doesn't exist
+    if (!user) {
+      return res.status(401).json({ 
+        error: 'No account found with this email. Please sign up to create an account.' 
+      });
+    }
     
     // Check if account is disabled
     if (user.isDisabled) {
@@ -3928,9 +3934,13 @@ app.post('/api/login', async (req, res) => {
       });
     }
     
-    // Compare password
+    // Compare password - specific error message if password is incorrect
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!isMatch) {
+      return res.status(401).json({ 
+        error: 'Incorrect password. Please check and re-enter your password.' 
+      });
+    }
     // Don't send password back
     const userObj = user.toObject();
     delete userObj.password;

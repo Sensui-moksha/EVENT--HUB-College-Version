@@ -103,7 +103,7 @@ export default function SubEventCard({ subEvent, showEditButton = true }: SubEve
               {subEvent.isTeamEvent && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-500/90 text-white rounded-full text-xs font-medium">
                   <Users className="w-3 h-3" />
-                  Team
+                  Team ({subEvent.minTeamSize || 2}-{subEvent.maxTeamSize || 4})
                 </span>
               )}
               <AccessControlBadge accessControl={subEvent.accessControl} size="sm" />
@@ -138,7 +138,7 @@ export default function SubEventCard({ subEvent, showEditButton = true }: SubEve
               {subEvent.isTeamEvent && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 text-white rounded-full text-xs font-medium">
                   <Users className="w-3 h-3" />
-                  Team
+                  Team ({subEvent.minTeamSize || 2}-{subEvent.maxTeamSize || 4})
                 </span>
               )}
               <AccessControlBadge accessControl={subEvent.accessControl} size="sm" />

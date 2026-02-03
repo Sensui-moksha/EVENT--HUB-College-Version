@@ -1324,6 +1324,20 @@ const SubEventDetails: React.FC = () => {
                   </p>
                 </div>
               </div>
+
+              {subEvent.isTeamEvent && (
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-2 sm:p-3 bg-purple-50 rounded-lg flex-shrink-0">
+                    <Users className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide">Team Event</p>
+                    <p className="text-xs sm:text-sm font-semibold text-purple-700">
+                      {subEvent.minTeamSize || 2} - {subEvent.maxTeamSize || 4} members per team
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Tags */}

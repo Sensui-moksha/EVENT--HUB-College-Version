@@ -157,7 +157,7 @@ const EventCard: React.FC<EventCardProps> = ({ event }) => {
   const { registrations } = useEvents();
   const backendEventId = (event as any)._id || event.id;
   const countedParticipants = registrations
-    ? registrations.filter((r: any) => String(r.eventId) === String(backendEventId) && (r.approvalStatus === 'approved' || r.status === 'registered')).length
+    ? registrations.filter((r: any) => String(r.eventId) === String(backendEventId) && r.approvalStatus === 'approved').length
     : 0;
 
   // Prefer the counted value when available (i.e., registrations loaded). Fallback to event.currentParticipants.
@@ -278,6 +278,16 @@ const EventCard: React.FC<EventCardProps> = ({ event }) => {
             <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-2 text-blue-500 flex-shrink-0" />
             <span className="truncate">{displayedParticipants} / {event.maxParticipants} participants</span>
           </div>
+          {(event as any).isTeamEvent && (
+            <div className="flex items-center text-xs sm:text-sm text-gray-600">
+              <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-2 text-purple-500 flex-shrink-0" />
+              <span className="truncate">
+                <span className="font-medium text-purple-700">Team Event</span>
+                <span className="text-gray-400 mx-1">•</span>
+                {(event as any).minTeamSize || 2}-{(event as any).maxTeamSize || 4} members
+              </span>
+            </div>
+          )}
           <div className="flex items-center text-xs sm:text-sm text-gray-600">
             <Calendar className="w-3 h-3 sm:w-4 sm:h-4 mr-2 text-yellow-500 flex-shrink-0" />
             <span className="truncate">Reg. Deadline: {event.registrationDeadline ? format(new Date(event.registrationDeadline), 'MMM dd, yyyy hh:mm a') : '-'}</span>

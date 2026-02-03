@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,11 +11,22 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const formCardRef = useRef<HTMLDivElement>(null);
 
   const { login, loading } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [forgotOpen, setForgotOpen] = useState(false);
+
+  // Auto-scroll to show the full login card on mobile when page loads
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (formCardRef.current && window.innerWidth < 1024) {
+        formCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 300); // Small delay to let the page render first
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,12 +84,13 @@ const Login: React.FC = () => {
       <div className="min-h-screen flex pt-12 xs:pt-14 sm:pt-16">
         {/* Left Side - Form Section (Scrollable) */}
         <motion.div 
-          className="w-full lg:w-1/2 flex items-center justify-center p-3 xs:p-4 sm:p-6 md:p-12 overflow-y-auto min-h-screen"
+          className="w-full lg:w-1/2 flex items-center justify-center p-3 xs:p-4 sm:p-6 md:p-12 overflow-y-auto py-6 xs:py-8"
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
           <motion.div 
+            ref={formCardRef}
             className="w-full max-w-md bg-white rounded-lg xs:rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl border border-neutral-200 p-4 xs:p-6 sm:p-8 md:p-10"
             variants={fadeInVariants}
             initial="hidden"
@@ -172,7 +184,7 @@ const Login: React.FC = () => {
                 disabled={loading}
                 className="w-full py-3 xs:py-3.5 px-3 xs:px-4 bg-neutral-800 text-white rounded-lg font-semibold hover:bg-neutral-900 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg mt-5 xs:mt-6 text-sm xs:text-base min-h-[44px]"
               >
-                {loading ? 'Entering...' : 'Enter the Realm'}
+                {loading ? 'Entering...' : 'Login'}
               </button>
 
               <div className="text-center pt-2 xs:pt-3">
@@ -189,9 +201,9 @@ const Login: React.FC = () => {
               {/* Footer */}
               <div className="text-center pt-3 xs:pt-4">
                 <p className="text-xs xs:text-sm text-neutral-600">
-                  New to this realm?{' '}
+                  New to this Website?{' '}
                   <Link to="/register" className="text-neutral-800 hover:text-neutral-900 font-semibold underline">
-                    Join here
+                    Sign up
                   </Link>
                 </p>
               </div>

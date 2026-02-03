@@ -1051,15 +1051,14 @@ const EventDetails: React.FC = () => {
 
   // Compute displayed participants with a robust fallback:
   // - Prefer backend `event.currentParticipants` when available
-  // - Use approved registrations count or total registrations from front-end as fallback
+  // - Use approved registrations count from front-end as fallback
   // NOTE: Moved here (before early returns) to satisfy React's Rules of Hooks
   const displayedParticipants = useMemo(() => {
     if (!event) return 0;
     const backendCount = typeof (event.currentParticipants) === 'number' ? event.currentParticipants : 0;
     const approvedCount = eventRegistrations.filter(r => r.approvalStatus === 'approved').length;
-    const totalRegs = eventRegistrations.length;
-    // Use the maximum observed value to avoid under-reporting due to stale backend counts
-    return Math.max(backendCount || 0, approvedCount, totalRegs);
+    // Use the maximum of backend count or approved count to avoid under-reporting
+    return Math.max(backendCount || 0, approvedCount);
   }, [event, eventRegistrations]);
 
   // Reset to page 1 when filters change
@@ -1831,6 +1830,16 @@ const EventDetails: React.FC = () => {
                     <Users className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3 text-blue-500 flex-shrink-0" />
                     <span>{displayedParticipants} / {event.maxParticipants} participants</span>
                   </div>
+                  {event.isTeamEvent && (
+                    <div className="flex items-center text-gray-600 text-sm sm:text-base">
+                      <Users className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3 text-purple-500 flex-shrink-0" />
+                      <span className="flex items-center gap-1">
+                        <span className="font-medium text-purple-700">Team Event</span>
+                        <span className="text-gray-400">•</span>
+                        <span>{event.minTeamSize || 2} - {event.maxTeamSize || 4} members per team</span>
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-center text-gray-600 text-sm sm:text-base">
                     <User className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3 text-blue-500 flex-shrink-0" />
                     <span className="break-words">
