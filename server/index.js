@@ -4437,13 +4437,16 @@ app.delete('/api/users/:id', async (req, res) => {
 app.put('/api/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, department, section, mobile, year, regId, avatar, role, roomNo, admissionMonth, admissionYear, graduationYear, lateralEntry } = req.body;
+    const { name, email, department, section, mobile, year, regId, avatar, role, roomNo, admissionMonth, admissionYear, graduationYear, lateralEntry, college } = req.body;
     
     // Build updates object to avoid overwriting with undefined
     const updates = {};
     if (typeof name !== 'undefined') updates.name = name;
     if (typeof email !== 'undefined') updates.email = email;
-    if (typeof department !== 'undefined') updates.department = department;
+    if (typeof department !== 'undefined') {
+      updates.department = department;
+      updates.branch = department; // Keep branch in sync with department
+    }
     if (typeof section !== 'undefined') updates.section = section;
     if (typeof mobile !== 'undefined') updates.mobile = mobile;
     if (typeof year !== 'undefined') updates.year = year;
@@ -4455,6 +4458,7 @@ app.put('/api/users/:id', async (req, res) => {
     if (typeof admissionYear !== 'undefined') updates.admissionYear = admissionYear;
     if (typeof graduationYear !== 'undefined') updates.graduationYear = graduationYear;
     if (typeof lateralEntry !== 'undefined') updates.lateralEntry = lateralEntry;
+    if (typeof college !== 'undefined') updates.college = college;
     
     // Find and update user
     const user = await User.findByIdAndUpdate(
@@ -4477,7 +4481,7 @@ app.put('/api/users/:id', async (req, res) => {
 // Create new user (admin only)  
 app.post('/api/users', async (req, res) => {
   try {
-  const { name, email, password, role, department, section, mobile, year, regId, roomNo } = req.body;
+  const { name, email, password, role, department, section, mobile, year, regId, roomNo, college, admissionMonth, admissionYear, graduationYear, lateralEntry } = req.body;
     
     // Basic validation
     if (!name || !email || !password || !role || !department || !mobile) {
@@ -4529,7 +4533,13 @@ app.post('/api/users', async (req, res) => {
       mobile,
   year: role === 'faculty' ? undefined : year,
       regId: regId || `USER-${Date.now()}`,
-      branch: department // Set branch same as department for compatibility
+      branch: department, // Set branch same as department for compatibility
+      college: college || 'DVR & Dr. HS MIC College of Technology', // Default college if not provided
+      // Admission details for students
+      admissionMonth: role === 'student' ? admissionMonth : undefined,
+      admissionYear: role === 'student' ? admissionYear : undefined,
+      graduationYear: role === 'student' ? graduationYear : undefined,
+      lateralEntry: role === 'student' ? lateralEntry : undefined
     });
     
     await user.save();
@@ -5148,19 +5158,66 @@ app.post('/api/events', async (req, res) => {
       // Run notification in background - don't await
       (async () => {
         try {
-          // Notify users about the new event based on notifyAllUsers setting
-          let usersToNotify;
-          if (event.notifyAllUsers) {
-            usersToNotify = await User.find({}).select('_id name email').lean();
-          } else {
-            usersToNotify = await User.find({ college: event.collegeName }).select('_id name email').lean();
-            if (usersToNotify.length === 0) {
-              usersToNotify = await User.find({}).select('_id name email').lean();
+          // Build query based on access control and settings
+          let userQuery = {};
+          const eventAccessControl = event.accessControl || { type: 'everyone' };
+          
+          // First, handle college filtering
+          if (!event.notifyAllUsers) {
+            // Only notify users from the same college
+            userQuery.college = event.collegeName;
+          }
+          
+          // Then, apply access control filters
+          if (eventAccessControl.type === 'students_only') {
+            userQuery.role = 'student';
+          } else if (eventAccessControl.type === 'faculty_only') {
+            userQuery.role = 'faculty';
+          } else if (eventAccessControl.type === 'custom') {
+            // Custom access control with specific years, departments, or roles
+            const orConditions = [];
+            
+            // Filter by allowed roles
+            if (eventAccessControl.allowedRoles && eventAccessControl.allowedRoles.length > 0) {
+              orConditions.push({ role: { $in: eventAccessControl.allowedRoles } });
             }
+            
+            // For students with specific year/department restrictions
+            if (eventAccessControl.allowedYears && eventAccessControl.allowedYears.length > 0) {
+              const studentCondition = { 
+                role: 'student',
+                year: { $in: eventAccessControl.allowedYears }
+              };
+              // Also filter by departments if specified
+              if (eventAccessControl.allowedDepartments && eventAccessControl.allowedDepartments.length > 0) {
+                studentCondition.department = { $in: eventAccessControl.allowedDepartments };
+              }
+              orConditions.push(studentCondition);
+            } else if (eventAccessControl.allowedDepartments && eventAccessControl.allowedDepartments.length > 0) {
+              // Only department filter without year
+              orConditions.push({ department: { $in: eventAccessControl.allowedDepartments } });
+            }
+            
+            // If we have conditions, apply them with $or
+            if (orConditions.length > 0) {
+              userQuery.$or = orConditions;
+            }
+          }
+          // 'everyone' type has no additional filters
+          
+          // Fetch users to notify
+          let usersToNotify = await User.find(userQuery).select('_id name email role year department').lean();
+          
+          // Fallback: if no users found with college filter, try all users (for backward compatibility)
+          if (usersToNotify.length === 0 && !event.notifyAllUsers) {
+            delete userQuery.college;
+            usersToNotify = await User.find(userQuery).select('_id name email role year department').lean();
           }
           
           const totalUsers = usersToNotify.length;
           const eventDetails = `New event "${event.title}" - ${event.category} on ${new Date(event.date).toLocaleDateString()} at ${event.time}, ${event.venue}`;
+          
+          console.log(`📢 Sending notifications for event "${event.title}" - Access: ${eventAccessControl.type}, Target users: ${totalUsers}`);
           
           // Emit job started to organizer
           io.to(`user_${organizerId}`).emit('backgroundJobStarted', {
@@ -5380,19 +5437,66 @@ app.post('/api/events/create', uploadMiddleware.single('image'), async (req, res
       // Run notification in background - don't await
       (async () => {
         try {
-          // Notify users based on notifyAllUsers setting
-          let usersToNotify;
-          if (event.notifyAllUsers) {
-            usersToNotify = await User.find({}).select('_id name email').lean();
-          } else {
-            usersToNotify = await User.find({ college: event.collegeName }).select('_id name email').lean();
-            if (usersToNotify.length === 0) {
-              usersToNotify = await User.find({}).select('_id name email').lean();
+          // Build query based on access control and settings
+          let userQuery = {};
+          const accessControl = event.accessControl || { type: 'everyone' };
+          
+          // First, handle college filtering
+          if (!event.notifyAllUsers) {
+            // Only notify users from the same college
+            userQuery.college = event.collegeName;
+          }
+          
+          // Then, apply access control filters
+          if (accessControl.type === 'students_only') {
+            userQuery.role = 'student';
+          } else if (accessControl.type === 'faculty_only') {
+            userQuery.role = 'faculty';
+          } else if (accessControl.type === 'custom') {
+            // Custom access control with specific years, departments, or roles
+            const orConditions = [];
+            
+            // Filter by allowed roles
+            if (accessControl.allowedRoles && accessControl.allowedRoles.length > 0) {
+              orConditions.push({ role: { $in: accessControl.allowedRoles } });
             }
+            
+            // For students with specific year/department restrictions
+            if (accessControl.allowedYears && accessControl.allowedYears.length > 0) {
+              const studentCondition = { 
+                role: 'student',
+                year: { $in: accessControl.allowedYears }
+              };
+              // Also filter by departments if specified
+              if (accessControl.allowedDepartments && accessControl.allowedDepartments.length > 0) {
+                studentCondition.department = { $in: accessControl.allowedDepartments };
+              }
+              orConditions.push(studentCondition);
+            } else if (accessControl.allowedDepartments && accessControl.allowedDepartments.length > 0) {
+              // Only department filter without year
+              orConditions.push({ department: { $in: accessControl.allowedDepartments } });
+            }
+            
+            // If we have conditions, apply them with $or
+            if (orConditions.length > 0) {
+              userQuery.$or = orConditions;
+            }
+          }
+          // 'everyone' type has no additional filters
+          
+          // Fetch users to notify
+          let usersToNotify = await User.find(userQuery).select('_id name email role year department').lean();
+          
+          // Fallback: if no users found with college filter, try all users (for backward compatibility)
+          if (usersToNotify.length === 0 && !event.notifyAllUsers) {
+            delete userQuery.college;
+            usersToNotify = await User.find(userQuery).select('_id name email role year department').lean();
           }
           
           const totalUsers = usersToNotify.length;
           const eventDetails = `New event "${event.title}" - ${event.category} on ${new Date(event.date).toLocaleDateString()} at ${event.time}, ${event.venue}`;
+          
+          console.log(`📢 Sending notifications for event "${event.title}" - Access: ${accessControl.type}, Target users: ${totalUsers}`);
           
           // Emit job started to organizer
           console.log(`🚀 Emitting backgroundJobStarted to user_${organizerId}`);

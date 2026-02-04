@@ -55,6 +55,7 @@ interface UserFormData {
   admissionYear?: number;
   graduationYear?: number;
   lateralEntry?: boolean;
+  college?: string;
 }
 
 interface EditUserData {
@@ -71,6 +72,7 @@ interface EditUserData {
   admissionYear?: number;
   graduationYear?: number;
   lateralEntry?: boolean;
+  college?: string;
 }
 
 const AdminUsers: React.FC = () => {
@@ -114,7 +116,8 @@ const AdminUsers: React.FC = () => {
     admissionMonth: 7,
     admissionYear: new Date().getFullYear(),
     graduationYear: new Date().getFullYear() + 4,
-    lateralEntry: false
+    lateralEntry: false,
+    college: DEFAULT_COLLEGE
   });
   
   const [editForm, setEditForm] = useState<EditUserData>({
@@ -130,7 +133,8 @@ const AdminUsers: React.FC = () => {
     admissionMonth: 7,
     admissionYear: new Date().getFullYear(),
     graduationYear: new Date().getFullYear() + 4,
-    lateralEntry: false
+    lateralEntry: false,
+    college: ''
   });
   
   const [passwordForm, setPasswordForm] = useState({
@@ -399,6 +403,8 @@ const AdminUsers: React.FC = () => {
             // don't send year for faculty or admin roles
             year: createForm.role === 'faculty' || createForm.role === 'admin' ? undefined as unknown as string : createForm.year,
             roomNo: (createForm as any).roomNo,
+            // include college name
+            college: createForm.college || DEFAULT_COLLEGE,
           })
       });
       
@@ -416,7 +422,8 @@ const AdminUsers: React.FC = () => {
           mobile: '',
           year: '',
           regId: '',
-          role: 'user'
+          role: 'user',
+          college: DEFAULT_COLLEGE
         });
         fetchUsers();
       } else {
@@ -456,6 +463,8 @@ const AdminUsers: React.FC = () => {
             admissionYear: editForm.role === 'student' ? editForm.admissionYear : undefined,
             graduationYear: editForm.role === 'student' ? editForm.graduationYear : undefined,
             lateralEntry: editForm.role === 'student' ? editForm.lateralEntry : undefined,
+            // include college name
+            college: editForm.college,
           })
       });
       
@@ -552,7 +561,8 @@ const AdminUsers: React.FC = () => {
       admissionMonth: user.admissionMonth || 7,
       admissionYear: user.admissionYear || new Date().getFullYear(),
       graduationYear: user.graduationYear || new Date().getFullYear() + 4,
-      lateralEntry: user.lateralEntry || false
+      lateralEntry: user.lateralEntry || false,
+      college: user.college || ''
     });
     setShowEditForm(true);
   };
@@ -1259,6 +1269,20 @@ const AdminUsers: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">College Name *</label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Building2 className="w-4 h-4" /></div>
+                    <input
+                      className="pl-10 pr-3 py-2 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      value={createForm.college || ''}
+                      onChange={(e) => setCreateForm((prev) => ({ ...prev, college: e.target.value }))}
+                      placeholder="Enter college name"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Department *</label>
                   <div className="relative">
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Briefcase className="w-4 h-4" /></div>
@@ -1477,6 +1501,18 @@ const AdminUsers: React.FC = () => {
                     className="w-full px-4 py-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-white/80 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
                     value={editForm.regId}
                     onChange={(e) => setEditForm((prev) => ({ ...prev, regId: e.target.value }))}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">College Name *</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-4 py-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-white/80 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
+                    value={editForm.college || ''}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, college: e.target.value }))}
+                    placeholder="Enter college name"
                   />
                 </div>
                 
