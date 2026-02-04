@@ -1,0 +1,38 @@
+# Nixpacks configuration for Coolify deployment
+# This file configures the build environment to include Python and build tools
+# required for native npm packages like 'canvas'
+
+[phases.setup]
+nixPkgs = [
+  "nodejs_22",
+  "npm-9_x", 
+  "python3",
+  "pkg-config",
+  "pixman",
+  "cairo",
+  "pango",
+  "libjpeg",
+  "giflib",
+  "librsvg"
+]
+
+# Install apt packages needed for canvas compilation
+aptPkgs = [
+  "build-essential",
+  "libcairo2-dev",
+  "libpango1.0-dev",
+  "libjpeg-dev",
+  "libgif-dev",
+  "librsvg2-dev",
+  "libpixman-1-dev",
+  "python3"
+]
+
+[phases.install]
+cmds = ["npm ci && npm --prefix server ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "node --max-old-space-size=4096 server/index.js"
