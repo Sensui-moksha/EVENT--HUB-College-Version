@@ -948,23 +948,89 @@ const AdminUsers: React.FC = () => {
         {/* Users Table - My College */}
         {activeTab === 'myCollege' && (
         <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Mobile Card View */}
+          <div className="sm:hidden divide-y divide-gray-200">
+            {myCollegeUsers.map((userData) => (
+              <div key={userData._id} className="p-4 hover:bg-gray-50">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-medium">
+                        {userData.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-gray-900">{userData.name}</div>
+                      <div className="text-xs text-gray-500">ID: {userData.regId}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{userData.department}</div>
+                      {userData.college && (
+                        <div className="text-xs text-blue-600 mt-0.5">{userData.college}</div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
+                      userData.role === 'admin' 
+                        ? 'bg-purple-100 text-purple-800'
+                        : userData.role === 'organizer'
+                        ? 'bg-blue-100 text-blue-800'
+                        : userData.role === 'faculty'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-green-100 text-green-800'
+                    }`}>
+                      {userData.role}
+                    </span>
+                    {userData.accountStatus === 'pending' && (
+                      <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                        Pending
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-4">
+                  <button
+                    onClick={() => openEditForm(userData)}
+                    className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => openPasswordForm(userData)}
+                    className="text-yellow-600 hover:text-yellow-900 text-sm font-medium"
+                  >
+                    Password
+                  </button>
+                  {userData._id !== userId && (
+                    <button
+                      onClick={() => handleDeleteUser(userData._id, userData.name)}
+                      className="text-red-600 hover:text-red-900 text-sm font-medium"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     User
                   </th>
-                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Contact
                   </th>
-                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
-                    Academic Details
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
+                    Details
                   </th>
-                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Role
                   </th>
-                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -972,46 +1038,45 @@ const AdminUsers: React.FC = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {myCollegeUsers.map((userData) => (
                   <tr key={userData._id} className="hover:bg-gray-50">
-                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap">
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10">
-                          <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-blue-500 flex items-center justify-center">
-                            <span className="text-white text-xs sm:text-base font-medium">
+                        <div className="flex-shrink-0 h-10 w-10">
+                          <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+                            <span className="text-white font-medium">
                               {userData.name.charAt(0).toUpperCase()}
                             </span>
                           </div>
                         </div>
-                        <div className="ml-2 sm:ml-4 min-w-0">
-                          <div className="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[80px] sm:max-w-[150px] md:max-w-none">
+                        <div className="ml-4 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate max-w-[150px] md:max-w-none">
                             {userData.name}
                           </div>
-                          <div className="text-xs text-gray-500 truncate max-w-[80px] sm:max-w-[150px] md:max-w-none">
+                          <div className="text-xs text-gray-500 truncate max-w-[150px] md:max-w-none">
                             ID: {userData.regId}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap hidden sm:table-cell">
-                      <div className="text-xs sm:text-sm text-gray-900 truncate max-w-[120px] md:max-w-[200px]">{userData.email}</div>
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 truncate max-w-[150px] md:max-w-[200px]">{userData.email}</div>
                       <div className="text-xs text-gray-500">{userData.mobile}</div>
                     </td>
-                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap hidden lg:table-cell">
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap hidden lg:table-cell">
                       <div className="text-sm text-gray-900">{userData.department}</div>
                       <div className="text-xs text-gray-500">
                         {userData.role === 'faculty' ? (
-                          <>
-                            Room: {(userData as any).roomNo || '-'}
-                          </>
+                          <>Room: {userData.roomNo || '-'}</>
                         ) : (
-                          <>
-                            {userData.section} - Year {userData.year}
-                          </>
+                          <>{userData.section} - Year {userData.year}</>
                         )}
                       </div>
+                      {userData.college && (
+                        <div className="text-xs text-blue-600 mt-0.5">{userData.college}</div>
+                      )}
                     </td>
-                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap">
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col gap-1">
-                        <span className={`inline-flex px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold rounded-full ${
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           userData.role === 'admin' 
                             ? 'bg-purple-100 text-purple-800'
                             : userData.role === 'organizer'
@@ -1023,39 +1088,37 @@ const AdminUsers: React.FC = () => {
                           {userData.role}
                         </span>
                         {userData.accountStatus === 'pending' && (
-                          <span className="inline-flex px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
                             Pending
                           </span>
                         )}
                         {userData.accountStatus === 'rejected' && (
-                          <span className="inline-flex px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
                             Rejected
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium">
-                      <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex flex-row gap-2">
                         <button
                           onClick={() => openEditForm(userData)}
-                          className="text-blue-600 hover:text-blue-900 text-xs sm:text-sm"
+                          className="text-blue-600 hover:text-blue-900"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => openPasswordForm(userData)}
-                          className="text-yellow-600 hover:text-yellow-900 text-xs sm:text-sm"
+                          className="text-yellow-600 hover:text-yellow-900"
                         >
-                          <span className="hidden sm:inline">Password</span>
-                          <span className="sm:hidden">Pass</span>
+                          Password
                         </button>
-                        {userData._id !== user._id && (
+                        {userData._id !== userId && (
                           <button
                             onClick={() => handleDeleteUser(userData._id, userData.name)}
-                            className="text-red-600 hover:text-red-900 text-xs sm:text-sm"
+                            className="text-red-600 hover:text-red-900"
                           >
-                            <span className="hidden sm:inline">Delete</span>
-                            <span className="sm:hidden">Del</span>
+                            Delete
                           </button>
                         )}
                       </div>
@@ -1080,26 +1143,85 @@ const AdminUsers: React.FC = () => {
         {/* Users Table - Other Colleges */}
         {activeTab === 'otherColleges' && (
         <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Mobile Card View */}
+          <div className="sm:hidden divide-y divide-gray-200">
+            {otherCollegeUsers.map((userData) => (
+              <div key={userData._id} className={`p-4 hover:bg-gray-50 ${selectedOtherCollegeUsers.includes(userData._id) ? 'bg-red-50' : ''}`}>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => toggleUserSelection(userData._id)}
+                      className="p-1 flex-shrink-0"
+                    >
+                      {selectedOtherCollegeUsers.includes(userData._id) ? (
+                        <CheckSquare className="w-5 h-5 text-red-600" />
+                      ) : (
+                        <Square className="w-5 h-5 text-gray-400 hover:text-gray-600" />
+                      )}
+                    </button>
+                    <div className="h-10 w-10 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-medium">
+                        {userData.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-gray-900">{userData.name}</div>
+                      <div className="text-xs text-gray-500">ID: {userData.regId}</div>
+                      <div className="text-xs text-purple-600 mt-0.5">{userData.college || 'Not specified'}</div>
+                      <div className="text-xs text-gray-500">{userData.department}</div>
+                    </div>
+                  </div>
+                  <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
+                    userData.role === 'admin' 
+                      ? 'bg-purple-100 text-purple-800'
+                      : userData.role === 'organizer'
+                      ? 'bg-blue-100 text-blue-800'
+                      : userData.role === 'faculty'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-green-100 text-green-800'
+                  }`}>
+                    {userData.role}
+                  </span>
+                </div>
+                <div className="mt-3 flex items-center gap-4 ml-9">
+                  <button
+                    onClick={() => openEditForm(userData)}
+                    className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteUser(userData._id, userData.name)}
+                    className="text-red-600 hover:text-red-900 text-sm font-medium"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-purple-50">
                 <tr>
-                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider w-8 sm:w-12">
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider w-12">
                     <span className="sr-only">Select</span>
                   </th>
-                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">
                     User
                   </th>
-                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider hidden sm:table-cell">
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">
                     College
                   </th>
-                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider hidden md:table-cell">
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider hidden md:table-cell">
                     Contact
                   </th>
-                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">
                     Role
                   </th>
-                  <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-purple-700 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -1107,49 +1229,49 @@ const AdminUsers: React.FC = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {otherCollegeUsers.map((userData) => (
                   <tr key={userData._id} className={`hover:bg-gray-50 ${selectedOtherCollegeUsers.includes(userData._id) ? 'bg-red-50' : ''}`}>
-                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap">
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                       <button
                         onClick={() => toggleUserSelection(userData._id)}
                         className="p-1"
                       >
                         {selectedOtherCollegeUsers.includes(userData._id) ? (
-                          <CheckSquare className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
+                          <CheckSquare className="w-5 h-5 text-red-600" />
                         ) : (
-                          <Square className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 hover:text-gray-600" />
+                          <Square className="w-5 h-5 text-gray-400 hover:text-gray-600" />
                         )}
                       </button>
                     </td>
-                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap">
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10">
-                          <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-purple-500 flex items-center justify-center">
-                            <span className="text-white text-xs sm:text-base font-medium">
+                        <div className="flex-shrink-0 h-10 w-10">
+                          <div className="h-10 w-10 rounded-full bg-purple-500 flex items-center justify-center">
+                            <span className="text-white font-medium">
                               {userData.name.charAt(0).toUpperCase()}
                             </span>
                           </div>
                         </div>
-                        <div className="ml-2 sm:ml-4 min-w-0">
-                          <div className="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[60px] sm:max-w-[100px] md:max-w-[150px]">
+                        <div className="ml-4 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate max-w-[100px] md:max-w-[150px]">
                             {userData.name}
                           </div>
-                          <div className="text-xs text-gray-500 truncate max-w-[60px] sm:max-w-[100px] md:max-w-[150px]">
+                          <div className="text-xs text-gray-500 truncate max-w-[100px] md:max-w-[150px]">
                             ID: {userData.regId}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap hidden sm:table-cell">
-                      <div className="text-xs sm:text-sm text-purple-700 font-medium truncate max-w-[100px] md:max-w-[150px]">
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-purple-700 font-medium truncate max-w-[100px] md:max-w-[150px]">
                         {userData.college || 'Not specified'}
                       </div>
                       <div className="text-xs text-gray-500">{userData.department}</div>
                     </td>
-                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap hidden md:table-cell">
-                      <div className="text-xs sm:text-sm text-gray-900 truncate max-w-[150px]">{userData.email}</div>
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap hidden md:table-cell">
+                      <div className="text-sm text-gray-900 truncate max-w-[150px]">{userData.email}</div>
                       <div className="text-xs text-gray-500">{userData.mobile}</div>
                     </td>
-                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold rounded-full ${
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         userData.role === 'admin' 
                           ? 'bg-purple-100 text-purple-800'
                           : userData.role === 'organizer'
@@ -1161,20 +1283,19 @@ const AdminUsers: React.FC = () => {
                         {userData.role}
                       </span>
                     </td>
-                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium">
-                      <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex flex-row gap-2">
                         <button
                           onClick={() => openEditForm(userData)}
-                          className="text-blue-600 hover:text-blue-900 text-xs sm:text-sm"
+                          className="text-blue-600 hover:text-blue-900"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => handleDeleteUser(userData._id, userData.name)}
-                          className="text-red-600 hover:text-red-900 text-xs sm:text-sm"
+                          className="text-red-600 hover:text-red-900"
                         >
-                          <span className="hidden sm:inline">Delete</span>
-                          <span className="sm:hidden">Del</span>
+                          Delete
                         </button>
                       </div>
                     </td>

@@ -5,7 +5,7 @@ import { useEvents } from '../contexts/EventContext.tsx';
 // Custom hook for triggering immediate data refresh
 export const useImmediateRefresh = () => {
   const { refreshUserData } = useAuth();
-  const { loading: eventsLoading } = useEvents();
+  const { isRefreshing } = useEvents();
 
   const triggerImmediateRefresh = useCallback(async () => {
     // Trigger immediate user data refresh
@@ -15,8 +15,6 @@ export const useImmediateRefresh = () => {
     // This will be handled by the auto-refresh system
     window.dispatchEvent(new Event('forceRefresh'));
   }, [refreshUserData]);
-
-  const isRefreshing = eventsLoading;
 
   return {
     triggerImmediateRefresh,

@@ -1052,8 +1052,8 @@ const userSchema = new mongoose.Schema({
   avatar: { type: String }, // Add avatar field for profile pictures
   avatarGridFsId: { type: mongoose.Schema.Types.ObjectId },
   privacySettings: {
-    showEmail: { type: Boolean, default: true },
-    showMobile: { type: Boolean, default: true },
+    showEmail: { type: Boolean, default: false },
+    showMobile: { type: Boolean, default: false },
     showSection: { type: Boolean, default: true },
     showYear: { type: Boolean, default: true },
     showRegId: { type: Boolean, default: true },
@@ -4232,8 +4232,8 @@ app.put('/api/user/:id/privacy', async (req, res) => {
     }
     
     user.privacySettings = {
-      showEmail: privacySettings.showEmail ?? true,
-      showMobile: privacySettings.showMobile ?? true,
+      showEmail: privacySettings.showEmail ?? false,
+      showMobile: privacySettings.showMobile ?? false,
       showSection: privacySettings.showSection ?? true,
       showYear: privacySettings.showYear ?? true,
       showRegId: privacySettings.showRegId ?? true,

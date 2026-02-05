@@ -1,9 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useEvents } from '../contexts/EventContext.tsx';
 import { useNotifications } from '../contexts/NotificationContext';
-import RefreshIndicator from './RefreshIndicator';
 import ManualRefreshButton from './ManualRefreshButton';
 import NotificationDrawer from './NotificationDrawer';
 import { motion } from 'framer-motion';
@@ -26,8 +24,7 @@ import {
 } from 'lucide-react';
 
 const Navbar: React.FC = () => {
-  const { user, logout, loading: authLoading } = useAuth();
-  const { loading: eventsLoading } = useEvents();
+  const { user, logout } = useAuth();
   const { notifications, unreadCount, markAsRead, clearAllNotifications } = useNotifications();
   const location = useLocation();
   const navigate = useNavigate();
@@ -39,8 +36,6 @@ const Navbar: React.FC = () => {
   const [pendingUsersCount, setPendingUsersCount] = useState<number>(0);
   const navRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
-
-  const isRefreshing = authLoading || eventsLoading;
 
   const handleLogout = () => {
     logout();
@@ -279,7 +274,6 @@ const Navbar: React.FC = () => {
 
                 {/* Refresh Controls - Only show on larger screens */}
                 <div className="hidden xl:flex items-center space-x-1">
-                  <RefreshIndicator isRefreshing={isRefreshing} />
                   <ManualRefreshButton showText={false} />
                 </div>
 
@@ -469,11 +463,8 @@ const Navbar: React.FC = () => {
               {/* Mobile Refresh Controls */}
               {user && (
                 <div className="flex items-center justify-between px-3 py-2 mt-4 pt-4 border-t border-gray-200">
-                  <span className="text-sm text-gray-600">Refresh Status</span>
-                  <div className="flex items-center space-x-2">
-                    <RefreshIndicator isRefreshing={isRefreshing} />
-                    <ManualRefreshButton showText={false} />
-                  </div>
+                  <span className="text-sm text-gray-600">Refresh Data</span>
+                  <ManualRefreshButton showText={false} />
                 </div>
               )}
             </div>

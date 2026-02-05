@@ -12,8 +12,8 @@ const PrivacySettings: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const [privacySettings, setPrivacySettings] = useState({
-    showEmail: true,
-    showMobile: true,
+    showEmail: false,
+    showMobile: false,
     showSection: true,
     showYear: true,
     showRegId: true,
@@ -26,8 +26,8 @@ const PrivacySettings: React.FC = () => {
   useEffect(() => {
     if (user?.privacySettings) {
       setPrivacySettings({
-        showEmail: user.privacySettings.showEmail ?? true,
-        showMobile: user.privacySettings.showMobile ?? true,
+        showEmail: user.privacySettings.showEmail ?? false,
+        showMobile: user.privacySettings.showMobile ?? false,
         showSection: user.privacySettings.showSection ?? true,
         showYear: user.privacySettings.showYear ?? true,
         showRegId: user.privacySettings.showRegId ?? true,

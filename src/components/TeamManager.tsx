@@ -1495,7 +1495,13 @@ const CreateTeamModal: React.FC<{
       onClick={(e) => e.stopPropagation()}
     >
       <h3 className="text-lg font-semibold text-gray-900 mb-2">Create Your Team</h3>
-      <p className="text-sm text-gray-500 mb-4">Choose a unique name for your team.</p>
+      <p className="text-sm text-gray-500 mb-2">Choose a unique name for your team.</p>
+      <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+        <p className="text-sm text-amber-800 flex items-start gap-2">
+          <Crown className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <span><strong>Note:</strong> Only the team leader should create the team. Other members will join via invitation.</span>
+        </p>
+      </div>
       <input
         type="text"
         value={teamName}

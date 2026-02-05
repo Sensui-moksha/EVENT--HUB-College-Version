@@ -5,8 +5,10 @@ import { AnimatePresence } from 'framer-motion';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { EventProvider } from './contexts/EventContext.tsx';
+import { ConnectionProvider } from './contexts/ConnectionContext';
 import { ToastProvider } from './components/ui/Toast';
 import BackgroundJobToast from './components/BackgroundJobToast';
+import ConnectionStatusBanner from './components/ConnectionStatusBanner';
 import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import OverlayFooter from './components/OverlayFooter';
@@ -323,24 +325,27 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <ToastProvider>
-          <NotificationProvider>
-            <EventProvider>
-              <Router>
-                <ScrollToTop />
-                <ScrollProgressBar />
-                <div className="min-h-screen flex flex-col">
-                  <Navbar />
-                  <main className="flex-1 pb-16 lg:pb-0">
-                    <AnimatedRoutes />
-                  </main>
-                  <BottomNav />
-                  <OverlayFooter />
-                  {/* Background job progress toasts */}
-                  <BackgroundJobToast />
-                </div>
-              </Router>
-            </EventProvider>
-          </NotificationProvider>
+          <ConnectionProvider>
+            <NotificationProvider>
+              <EventProvider>
+                <Router>
+                  <ScrollToTop />
+                  <ScrollProgressBar />
+                  <ConnectionStatusBanner />
+                  <div className="min-h-screen flex flex-col">
+                    <Navbar />
+                    <main className="flex-1 pb-16 lg:pb-0">
+                      <AnimatedRoutes />
+                    </main>
+                    <BottomNav />
+                    <OverlayFooter />
+                    {/* Background job progress toasts */}
+                    <BackgroundJobToast />
+                  </div>
+                </Router>
+              </EventProvider>
+            </NotificationProvider>
+          </ConnectionProvider>
         </ToastProvider>
       </AuthProvider>
     </ErrorBoundary>

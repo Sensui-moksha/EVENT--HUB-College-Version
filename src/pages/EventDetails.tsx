@@ -3113,7 +3113,8 @@ const EventDetails: React.FC = () => {
         )}
         </AnimatePresence>
 
-        {/* Registered Students Section */}
+        {/* Registered Students Section - Only for logged-in users */}
+        {user && (
         <div className="mb-6 sm:mb-8">
           <div className="flex flex-col gap-4 mb-4 sm:mb-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -3121,8 +3122,8 @@ const EventDetails: React.FC = () => {
                 Registered Students ({filteredAndSortedParticipants.length})
               </h2>
               
-              {/* View Toggle for Team Events */}
-              {event.isTeamEvent && (isPrivileged || user?.role === 'admin') && (
+              {/* View Toggle for Team Events - Visible to all users */}
+              {event.isTeamEvent && (
                 <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-lg">
                   <button
                     onClick={() => setParticipantView('individual')}
@@ -3529,6 +3530,7 @@ const EventDetails: React.FC = () => {
           </>
           )}
         </div>
+        )}
 
         {/* Approval Waiting List Section - Only for organizers/admins */}
         {(user?.role === 'admin' || 

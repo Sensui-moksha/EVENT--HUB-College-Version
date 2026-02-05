@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
 import { Event, Registration, EventResult, MultiEventRegistration, QRValidationResult } from '../types';
 import { useAuth } from './AuthContext';
+import { useConnection } from './ConnectionContext';
 import { cacheManager, cacheKeys, CACHE_TTL, invalidateCache } from '../utils/cacheManager';
 import { API_BASE_URL } from '../utils/api';
 
@@ -19,6 +20,7 @@ interface EventContextType {
     deleteEvents: (eventIds: string[]) => Promise<{ success: string[]; failed: { eventId: string; reason: string }[] }>;
   addResult: (eventId: string, results: Omit<EventResult, 'id' | 'eventId' | 'createdAt'>[]) => Promise<boolean>;
   loading: boolean;
+  isRefreshing: boolean;
 }
 
 const EventContext = createContext<EventContextType | undefined>(undefined);
@@ -37,6 +39,7 @@ interface EventProviderProps {
 
 export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
   const { user } = useAuth();
+  const { checkConnection } = useConnection();
   
   // Stable user ID to prevent unnecessary re-renders
   const userId = user?._id || user?.id;
@@ -45,6 +48,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [results, setResults] = useState<EventResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [subEventCounts, setSubEventCounts] = useState<Record<string, number>>({});
   
   // Prevent duplicate fetches in React StrictMode
@@ -150,6 +154,8 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Failed to fetch events from server:', error);
+      // Check connection status when fetch fails
+      checkConnection();
     }
   };
 
@@ -242,6 +248,8 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
       if (!res.ok) {
         console.error('Failed to fetch registrations: HTTP', res.status, data);
         setRegistrations([]); // Set empty array on error
+        // Check connection status when fetch fails
+        checkConnection();
         return;
       }
       if (data && Array.isArray(data.registrations)) {
@@ -255,6 +263,8 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('Failed to fetch registrations from server:', error);
       setRegistrations([]); // Set empty array on error
+      // Check connection status when fetch fails
+      checkConnection();
     }
   };
 
@@ -296,10 +306,14 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // Set up force refresh listener for manual triggers
-    const handleForceRefresh = () => {
+    const handleForceRefresh = async () => {
       if (!fetchInProgress.current) {
-        fetchEvents();
-        fetchRegistrations();
+        setIsRefreshing(true);
+        try {
+          await Promise.all([fetchEvents(), fetchRegistrations()]);
+        } finally {
+          setIsRefreshing(false);
+        }
       }
     };
 
@@ -710,6 +724,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
       deleteEvents,
     addResult,
     loading,
+    isRefreshing,
   };
 
   return <EventContext.Provider value={value}>{children}</EventContext.Provider>;
