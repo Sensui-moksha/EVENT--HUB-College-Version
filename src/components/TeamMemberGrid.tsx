@@ -211,7 +211,19 @@ const TeamMemberGrid: React.FC<TeamMemberGridProps> = ({
           )}
         </div>
 
-        {/* Name */}\n        {targetUser?._id || (targetUser as any)?.id ? (\n          <Link \n            to={`/user/${targetUser._id || (targetUser as any).id}`}\n            className=\"font-semibold text-gray-700 truncate w-full hover:text-amber-600 hover:underline transition-colors\"\n          >\n            {targetUser?.name || 'Unknown'}\n          </Link>\n        ) : (\n          <h4 className=\"font-semibold text-gray-700 truncate w-full\">\n            {targetUser?.name || 'Unknown'}\n          </h4>\n        )}
+        {/* Name */}
+        {targetUser?._id || (targetUser as any)?.id ? (
+          <Link 
+            to={`/user/${targetUser._id || (targetUser as any).id}`}
+            className="font-semibold text-gray-700 truncate w-full hover:text-amber-600 hover:underline transition-colors"
+          >
+            {targetUser?.name || 'Unknown'}
+          </Link>
+        ) : (
+          <h4 className="font-semibold text-gray-700 truncate w-full">
+            {targetUser?.name || 'Unknown'}
+          </h4>
+        )}
 
         {/* Status badge */}
         <span className="text-xs px-2 py-0.5 rounded-full mt-1 bg-amber-200 text-amber-700">
