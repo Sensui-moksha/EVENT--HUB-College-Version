@@ -59,7 +59,7 @@ export default function SubEventCard({ subEvent, showEditButton = true }: SubEve
     <motion.div
       whileHover={{ y: -6, boxShadow: '0 20px 40px rgba(59, 130, 246, 0.2)' }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-lg hover:shadow-2xl cursor-pointer transition-all group relative"
+      className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-lg ring-1 ring-gray-100 hover:shadow-2xl hover:ring-gray-200 cursor-pointer transition-all group relative"
       onClick={() => navigate(`/sub-events/${subEvent._id}`)}
     >
       {/* Gradient Overlay Top */}

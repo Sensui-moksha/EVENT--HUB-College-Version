@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
@@ -288,7 +289,14 @@ const TeamView: React.FC<TeamViewProps> = ({ eventId, refreshTrigger }) => {
                 <div className="text-left">
                   <h4 className="font-semibold text-gray-900">{team.name}</h4>
                   <p className="text-sm text-gray-500">
-                    {team.members.length}/{team.maxMembers} members • Led by {team.leaderId.name}
+                    {team.members.length}/{team.maxMembers} members • Led by{' '}
+                    <Link 
+                      to={`/user/${team.leaderId._id || team.leaderId.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-purple-600 hover:text-purple-800 hover:underline transition-colors"
+                    >
+                      {team.leaderId.name}
+                    </Link>
                   </p>
                 </div>
               </div>
@@ -349,9 +357,12 @@ const TeamView: React.FC<TeamViewProps> = ({ eventId, refreshTrigger }) => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium text-gray-900 truncate">
+                              <Link 
+                                to={`/user/${member.userId._id || member.userId.id}`}
+                                className="font-medium text-gray-900 truncate hover:text-purple-600 hover:underline transition-colors"
+                              >
                                 {member.userId.name}
-                              </span>
+                              </Link>
                               {member.role === 'leader' && (
                                 <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">
                                   Leader

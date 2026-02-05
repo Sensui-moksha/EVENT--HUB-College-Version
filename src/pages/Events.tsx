@@ -183,7 +183,7 @@ const Events: React.FC = () => {
             onClick={scrollToEvents}
             onKeyDown={handleStatKeyDown}
             aria-label="Scroll to events list"
-            className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200 hover:shadow-lg transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="bg-white rounded-xl p-4 sm:p-6 shadow-md border border-gray-200 ring-1 ring-gray-100 hover:shadow-xl hover:ring-gray-200 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <div className="flex items-center">
               <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
@@ -196,7 +196,7 @@ const Events: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200 hover:shadow-lg transition-shadow">
+          <div className="bg-white rounded-xl p-4 sm:p-6 shadow-md border border-gray-200 ring-1 ring-gray-100 hover:shadow-xl hover:ring-gray-200 transition-all">
             <div className="flex items-center">
               <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
                 <Users className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
@@ -208,7 +208,7 @@ const Events: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200 hover:shadow-lg transition-shadow sm:col-span-2 lg:col-span-1">
+          <div className="bg-white rounded-xl p-4 sm:p-6 shadow-md border border-gray-200 ring-1 ring-gray-100 hover:shadow-xl hover:ring-gray-200 transition-all sm:col-span-2 lg:col-span-1">
             <div className="flex items-center">
               <div className="p-2 sm:p-3 bg-yellow-100 rounded-lg">
                 <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600" />
@@ -222,7 +222,7 @@ const Events: React.FC = () => {
         </motion.div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200 mb-6 sm:mb-8">
+        <div className="bg-white rounded-xl p-4 sm:p-6 shadow-md border border-gray-200 ring-1 ring-gray-100 mb-6 sm:mb-8">
           <div className="flex flex-col gap-4">
             {/* Search */}
             <div className="w-full relative">

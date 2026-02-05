@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Users,
@@ -132,10 +133,13 @@ const TeamMemberGrid: React.FC<TeamMemberGridProps> = ({
         </div>
 
         {/* Name */}
-        <h4 className="font-semibold text-gray-900 truncate w-full">
+        <Link 
+          to={`/user/${user._id || (user as any).id}`}
+          className="font-semibold text-gray-900 truncate w-full hover:text-purple-600 hover:underline transition-colors"
+        >
           {user.name}
           {isCurrentUser && <span className="text-xs text-gray-500 ml-1">(You)</span>}
-        </h4>
+        </Link>
 
         {/* Role badge */}
         <span className={`text-xs px-2 py-0.5 rounded-full mt-1 ${
@@ -207,10 +211,7 @@ const TeamMemberGrid: React.FC<TeamMemberGridProps> = ({
           )}
         </div>
 
-        {/* Name */}
-        <h4 className="font-semibold text-gray-700 truncate w-full">
-          {targetUser?.name || 'Unknown'}
-        </h4>
+        {/* Name */}\n        {targetUser?._id || (targetUser as any)?.id ? (\n          <Link \n            to={`/user/${targetUser._id || (targetUser as any).id}`}\n            className=\"font-semibold text-gray-700 truncate w-full hover:text-amber-600 hover:underline transition-colors\"\n          >\n            {targetUser?.name || 'Unknown'}\n          </Link>\n        ) : (\n          <h4 className=\"font-semibold text-gray-700 truncate w-full\">\n            {targetUser?.name || 'Unknown'}\n          </h4>\n        )}
 
         {/* Status badge */}
         <span className="text-xs px-2 py-0.5 rounded-full mt-1 bg-amber-200 text-amber-700">

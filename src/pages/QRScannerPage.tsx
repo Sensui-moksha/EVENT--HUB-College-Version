@@ -75,7 +75,7 @@ const QRScannerPage: React.FC = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+          <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100">
             <div className="flex items-center">
               <div className="p-3 bg-blue-100 rounded-lg">
                 <Clock className="w-6 h-6 text-blue-600" />
@@ -87,7 +87,7 @@ const QRScannerPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+          <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100">
             <div className="flex items-center">
               <div className="p-3 bg-green-100 rounded-lg">
                 <CheckCircle className="w-6 h-6 text-green-600" />
@@ -99,7 +99,7 @@ const QRScannerPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+          <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100">
             <div className="flex items-center">
               <div className="p-3 bg-red-100 rounded-lg">
                 <XCircle className="w-6 h-6 text-red-600" />
@@ -114,7 +114,7 @@ const QRScannerPage: React.FC = () => {
 
         <div className="grid lg:grid-cols-2 gap-8">
           {/* QR Scanner Section */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+          <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Scanner</h2>
             
             {/* Event Selection */}
@@ -155,7 +155,7 @@ const QRScannerPage: React.FC = () => {
           </div>
 
           {/* Scan History Section */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+          <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Scan History</h2>
             
             <div className="space-y-4 max-h-96 overflow-y-auto">

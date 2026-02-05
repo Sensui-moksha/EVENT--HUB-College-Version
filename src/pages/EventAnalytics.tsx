@@ -381,7 +381,7 @@ const EventAnalytics: React.FC = () => {
                 <motion.div
                   key={i}
                   variants={itemVariants}
-                  className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+                  className="bg-white rounded-2xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100"
                 >
                   <div className="h-12 w-12 bg-gray-200 rounded-xl animate-pulse mb-4" />
                   <div className="h-8 bg-gray-200 rounded-lg w-20 animate-pulse mb-2" />
@@ -409,7 +409,7 @@ const EventAnalytics: React.FC = () => {
                     <motion.div
                       variants={itemVariants}
                       whileHover={cardHover}
-                      className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 relative overflow-hidden group"
+                      className="bg-white rounded-2xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100 relative overflow-hidden group"
                     >
                       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500" />
                       <div className="relative">
@@ -438,7 +438,7 @@ const EventAnalytics: React.FC = () => {
                     <motion.div
                       variants={itemVariants}
                       whileHover={cardHover}
-                      className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 relative overflow-hidden group"
+                      className="bg-white rounded-2xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100 relative overflow-hidden group"
                     >
                       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/10 to-green-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500" />
                       <div className="relative">
@@ -467,7 +467,7 @@ const EventAnalytics: React.FC = () => {
                     <motion.div
                       variants={itemVariants}
                       whileHover={cardHover}
-                      className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 relative overflow-hidden group"
+                      className="bg-white rounded-2xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100 relative overflow-hidden group"
                     >
                       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500" />
                       <div className="relative">
@@ -496,7 +496,7 @@ const EventAnalytics: React.FC = () => {
                     <motion.div
                       variants={itemVariants}
                       whileHover={cardHover}
-                      className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 relative overflow-hidden group"
+                      className="bg-white rounded-2xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100 relative overflow-hidden group"
                     >
                       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500" />
                       <div className="relative">
@@ -571,7 +571,7 @@ const EventAnalytics: React.FC = () => {
                     <motion.div
                       variants={itemVariants}
                       whileHover={{ scale: 1.01 }}
-                      className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+                      className="bg-white rounded-2xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100"
                     >
                       <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
@@ -667,7 +667,7 @@ const EventAnalytics: React.FC = () => {
                     <motion.div
                       variants={itemVariants}
                       whileHover={{ scale: 1.01 }}
-                      className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+                      className="bg-white rounded-2xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100"
                     >
                       <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
@@ -745,7 +745,7 @@ const EventAnalytics: React.FC = () => {
                   {/* Recent Activity */}
                   <motion.div
                     variants={itemVariants}
-                    className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+                    className="bg-white rounded-2xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100"
                   >
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center gap-3">
@@ -798,7 +798,7 @@ const EventAnalytics: React.FC = () => {
               {activeTab === 'events' && (
                 <motion.div
                   variants={itemVariants}
-                  className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+                  className="bg-white rounded-2xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100"
                 >
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
@@ -891,7 +891,7 @@ const EventAnalytics: React.FC = () => {
               {activeTab === 'registrations' && (
                 <motion.div
                   variants={itemVariants}
-                  className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+                  className="bg-white rounded-2xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100"
                 >
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
@@ -959,7 +959,7 @@ const EventAnalytics: React.FC = () => {
             variants={itemVariants}
             initial="hidden"
             animate="visible"
-            className="bg-white rounded-2xl p-12 text-center shadow-sm border border-gray-100"
+            className="bg-white rounded-2xl p-12 text-center shadow-md border border-gray-200 ring-1 ring-gray-100"
           >
             <Sparkles className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-gray-900 mb-2">No Data Available</h3>

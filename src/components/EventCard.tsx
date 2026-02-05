@@ -177,7 +177,7 @@ const EventCard: React.FC<EventCardProps> = ({ event }) => {
         initial="rest"
         whileHover="hover"
         whileTap="tap"
-        className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow duration-300 group cursor-pointer"
+        className="bg-white rounded-xl shadow-md border border-gray-200 ring-1 ring-gray-100 overflow-hidden hover:shadow-xl hover:ring-gray-200 transition-all duration-300 group cursor-pointer"
       >
       {/* Event Image */}
       {event.image && (() => {

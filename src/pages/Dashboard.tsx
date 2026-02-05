@@ -230,7 +230,7 @@ const Dashboard: React.FC = () => {
           {stats.map((stat, index) => (
             <motion.div
               key={index}
-              className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200 hover:shadow-lg transition-shadow"
+              className="bg-white rounded-xl p-4 sm:p-6 shadow-md border border-gray-200 ring-1 ring-gray-100 hover:shadow-xl hover:ring-gray-200 transition-all"
               variants={{
                 initial: { opacity: 0, y: 20 },
                 animate: { opacity: 1, y: 0 }
@@ -250,7 +250,7 @@ const Dashboard: React.FC = () => {
         </motion.div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="bg-white rounded-xl shadow-md border border-gray-200 ring-1 ring-gray-100">
           <div className="border-b border-gray-200">
             <nav className="flex overflow-x-auto px-4 sm:px-6">
               {tabs.map(tab => (

@@ -800,7 +800,7 @@ const TeamManager: React.FC<TeamManagerProps> = ({
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-xl shadow-md border border-gray-200 ring-1 ring-gray-100 p-6">
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
           <span className="ml-3 text-gray-600">Loading team data...</span>
@@ -812,7 +812,7 @@ const TeamManager: React.FC<TeamManagerProps> = ({
   // Show pending invites if user is not in a team
   if (!team && pendingInvites.length > 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-md border border-gray-200 ring-1 ring-gray-100 overflow-hidden">
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-3">
           <h3 className="text-lg font-semibold text-white flex items-center gap-2">
             <Users className="w-5 h-5" />
@@ -892,7 +892,7 @@ const TeamManager: React.FC<TeamManagerProps> = ({
   // Show create team option if user is not in a team
   if (!team) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-md border border-gray-200 ring-1 ring-gray-100 overflow-hidden">
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-3">
           <h3 className="text-lg font-semibold text-white flex items-center gap-2">
             <Users className="w-5 h-5" />
@@ -940,7 +940,7 @@ const TeamManager: React.FC<TeamManagerProps> = ({
 
   // Show team details
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-md border border-gray-200 ring-1 ring-gray-100 overflow-hidden">
       {/* Team Header */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-3">
         <div className="flex items-center justify-between">
