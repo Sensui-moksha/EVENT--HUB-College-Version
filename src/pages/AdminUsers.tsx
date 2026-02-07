@@ -22,7 +22,9 @@ import {
   ArrowUp,
   ArrowDown,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  Eye,
+  ChevronRight
 } from 'lucide-react';
 
 interface User {
@@ -105,6 +107,9 @@ const AdminUsers: React.FC = () => {
   // Promotion/demotion state
   const [promotionLoading, setPromotionLoading] = useState(false);
   const [promotionResults, setPromotionResults] = useState<{year: number; count: number}[]>([]);
+  
+  // Selected year to view student list
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
   
   // Registration approval settings
   const [requireApproval, setRequireApproval] = useState(false);
@@ -1026,14 +1031,118 @@ const AdminUsers: React.FC = () => {
               {/* Student Year Overview */}
               <div className="grid grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
                 {[1, 2, 3, 4].map(year => (
-                  <div key={year} className="bg-gray-50 rounded-lg p-2 sm:p-4 text-center border border-gray-200">
+                  <div
+                    key={year}
+                    onClick={() => setSelectedYear(selectedYear === year ? null : year)}
+                    className={`rounded-lg p-2 sm:p-4 text-center border-2 cursor-pointer transition-all active:scale-[0.97] ${
+                      selectedYear === year
+                        ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-200'
+                        : 'bg-gray-50 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+                    }`}
+                  >
                     <div className="text-lg sm:text-3xl font-bold text-gray-900">{studentsByYear[year as keyof typeof studentsByYear]}</div>
                     <div className="text-[10px] sm:text-sm text-gray-600 mt-0.5 sm:mt-1">
                       {year}{year === 1 ? 'st' : year === 2 ? 'nd' : year === 3 ? 'rd' : 'th'} Year
                     </div>
+                    <div className={`text-[9px] sm:text-xs mt-1 flex items-center justify-center gap-0.5 ${
+                      selectedYear === year ? 'text-blue-600 font-medium' : 'text-gray-400'
+                    }`}>
+                      <Eye className="w-3 h-3" />
+                      <span>{selectedYear === year ? 'Viewing' : 'View'}</span>
+                    </div>
                   </div>
                 ))}
               </div>
+
+              {/* Year Students List */}
+              {selectedYear !== null && (
+                <div className="mb-4 sm:mb-6">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
+                    <div className="flex items-center justify-between p-3 sm:p-4 border-b border-blue-200 bg-blue-100/60">
+                      <h3 className="text-sm sm:text-base font-semibold text-blue-900 flex items-center gap-2">
+                        <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                        {selectedYear}{selectedYear === 1 ? 'st' : selectedYear === 2 ? 'nd' : selectedYear === 3 ? 'rd' : 'th'} Year Students
+                        <span className="text-xs sm:text-sm font-normal text-blue-600 ml-1">
+                          ({studentsByYear[selectedYear as keyof typeof studentsByYear]})
+                        </span>
+                      </h3>
+                      <button
+                        onClick={() => setSelectedYear(null)}
+                        className="p-1 rounded hover:bg-blue-200 text-blue-600 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    {users.filter(u => u.role === 'student' && Number(u.year) === selectedYear).length === 0 ? (
+                      <div className="p-6 text-center text-gray-500 text-sm">
+                        No students found in {selectedYear}{selectedYear === 1 ? 'st' : selectedYear === 2 ? 'nd' : selectedYear === 3 ? 'rd' : 'th'} year.
+                      </div>
+                    ) : (
+                      <div className="max-h-80 sm:max-h-96 overflow-y-auto">
+                        {/* Mobile Card View */}
+                        <div className="sm:hidden divide-y divide-blue-100">
+                          {users
+                            .filter(u => u.role === 'student' && Number(u.year) === selectedYear)
+                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .map((student, idx) => (
+                              <div key={student._id} className="p-3 hover:bg-blue-50/80 flex items-center gap-3">
+                                <div className="text-xs text-gray-400 w-5 text-right flex-shrink-0">{idx + 1}</div>
+                                <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                                  <span className="text-white text-xs font-medium">
+                                    {student.name.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-medium text-gray-900 truncate">{student.name}</div>
+                                  <div className="text-xs text-gray-500 truncate">{student.regId} • {student.department}{student.section ? ` - ${student.section}` : ''}</div>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                              </div>
+                            ))}
+                        </div>
+
+                        {/* Desktop Table View */}
+                        <table className="hidden sm:table min-w-full">
+                          <thead className="bg-blue-50/80 sticky top-0">
+                            <tr>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider w-10">#</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Name</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Reg ID</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Department</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Section</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">Email</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-blue-100">
+                            {users
+                              .filter(u => u.role === 'student' && Number(u.year) === selectedYear)
+                              .sort((a, b) => a.name.localeCompare(b.name))
+                              .map((student, idx) => (
+                                <tr key={student._id} className="hover:bg-blue-50/60 transition-colors">
+                                  <td className="px-4 py-2.5 text-xs text-gray-400">{idx + 1}</td>
+                                  <td className="px-4 py-2.5">
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-7 w-7 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                                        <span className="text-white text-xs font-medium">
+                                          {student.name.charAt(0).toUpperCase()}
+                                        </span>
+                                      </div>
+                                      <span className="text-sm font-medium text-gray-900">{student.name}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-2.5 text-sm text-gray-600">{student.regId}</td>
+                                  <td className="px-4 py-2.5 text-sm text-gray-600">{student.department}</td>
+                                  <td className="px-4 py-2.5 text-sm text-gray-600">{student.section || '-'}</td>
+                                  <td className="px-4 py-2.5 text-sm text-gray-500">{student.email}</td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Warning */}
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2.5 sm:p-4 mb-4 sm:mb-6">
