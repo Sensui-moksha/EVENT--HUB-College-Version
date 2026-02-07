@@ -1473,7 +1473,8 @@ const SubEventDetails: React.FC = () => {
             <TeamManager
               eventId={id || ''}
               eventTitle={subEvent.title}
-              registrationDeadline={subEvent.registrationDeadline}
+              eventDate={subEvent.date || subEvent.registrationDeadline}
+              eventTime={subEvent.time}
               minTeamSize={subEvent.minTeamSize || 2}
               maxTeamSize={subEvent.maxTeamSize || 4}
               isSubEvent={true}

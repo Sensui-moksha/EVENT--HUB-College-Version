@@ -55,7 +55,8 @@ interface TokenInvitation {
 interface TeamManagerProps {
   eventId: string;
   eventTitle: string;
-  registrationDeadline: Date;
+  eventDate: Date;
+  eventTime?: string;
   minTeamSize?: number;
   maxTeamSize?: number;
   onTeamUpdate?: () => void;
@@ -65,7 +66,8 @@ interface TeamManagerProps {
 const TeamManager: React.FC<TeamManagerProps> = ({
   eventId,
   eventTitle: _eventTitle,
-  registrationDeadline,
+  eventDate,
+  eventTime,
   minTeamSize = 2,
   maxTeamSize = 5,
   onTeamUpdate,
@@ -123,7 +125,17 @@ const TeamManager: React.FC<TeamManagerProps> = ({
     pendingInvites: true,
   });
 
-  const deadlinePassed = new Date() > new Date(registrationDeadline);
+  const deadlinePassed = (() => {
+    const now = new Date();
+    const evtDate = new Date(eventDate);
+    if (eventTime) {
+      const [h, m] = eventTime.split(':').map(Number);
+      evtDate.setHours(h || 0, m || 0, 0, 0);
+    }
+    // Team editing allowed until 5 hours before event start
+    const cutoff = new Date(evtDate.getTime() - 5 * 60 * 60 * 1000);
+    return now > cutoff;
+  })();
 
   // Silent fetch that doesn't show loading spinner (for updates after actions)
   const fetchTeamDataSilent = useCallback(async () => {
@@ -893,27 +905,27 @@ const TeamManager: React.FC<TeamManagerProps> = ({
   if (!team) {
     return (
       <div className="bg-white rounded-xl shadow-md border border-gray-200 ring-1 ring-gray-100 overflow-hidden">
-        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-3">
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Users className="w-5 h-5" />
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-3 sm:px-4 py-2.5 sm:py-3">
+          <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+            <Users className="w-4 h-4 sm:w-5 sm:h-5" />
             Team Registration
           </h3>
         </div>
 
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {deadlinePassed ? (
-            <div className="text-center py-4">
-              <AlertCircle className="w-12 h-12 mx-auto text-yellow-500 mb-3" />
-              <p className="text-gray-600">Registration deadline has passed.</p>
-              <p className="text-sm text-gray-500 mt-1">Team creation is no longer available.</p>
+            <div className="text-center py-3 sm:py-4">
+              <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-yellow-500 mb-2 sm:mb-3" />
+              <p className="text-sm sm:text-base text-gray-600">Team editing is closed.</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">Less than 5 hours before event start.</p>
             </div>
           ) : (
             <div className="text-center">
-              <Users className="w-12 h-12 mx-auto text-purple-500 mb-3" />
-              <p className="text-gray-600 mb-4">You're not part of any team for this event yet.</p>
+              <Users className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-purple-500 mb-2 sm:mb-3" />
+              <p className="text-sm sm:text-base text-gray-600 mb-3 sm:mb-4">You're not part of any team for this event yet.</p>
               <button
                 onClick={() => setShowCreateTeam(true)}
-                className="py-2 px-6 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 mx-auto"
+                className="py-2 px-4 sm:px-6 bg-purple-600 text-white text-sm sm:text-base rounded-lg hover:bg-purple-700 active:bg-purple-800 transition-colors flex items-center justify-center gap-2 mx-auto"
               >
                 <UserPlus className="w-4 h-4" />
                 Create a Team
@@ -942,34 +954,34 @@ const TeamManager: React.FC<TeamManagerProps> = ({
   return (
     <div className="bg-white rounded-xl shadow-md border border-gray-200 ring-1 ring-gray-100 overflow-hidden">
       {/* Team Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-3">
+      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-3 sm:px-4 py-2.5 sm:py-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-lg">
-              <Users className="w-5 h-5 text-white" />
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="bg-white/20 p-1.5 sm:p-2 rounded-lg flex-shrink-0">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white">{team.name}</h3>
-              <p className="text-purple-200 text-sm">
+            <div className="min-w-0">
+              <h3 className="text-base sm:text-lg font-semibold text-white truncate">{team.name}</h3>
+              <p className="text-purple-200 text-xs sm:text-sm">
                 {team.members.length}/{team.maxMembers} members
               </p>
             </div>
           </div>
           {isLeader && !deadlinePassed && (
-            <div className="flex gap-2">
+            <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
               <button
                 onClick={() => {
                   setNewTeamName(team.name);
                   setShowRename(true);
                 }}
-                className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                className="p-1.5 sm:p-2 bg-white/20 hover:bg-white/30 active:bg-white/40 rounded-lg transition-colors"
                 title="Rename Team"
               >
                 <Edit3 className="w-4 h-4 text-white" />
               </button>
               <button
                 onClick={handleDeleteTeam}
-                className="p-2 bg-red-500/80 hover:bg-red-500 rounded-lg transition-colors"
+                className="p-1.5 sm:p-2 bg-red-500/80 hover:bg-red-500 active:bg-red-600 rounded-lg transition-colors"
                 title="Delete Team"
               >
                 <Trash2 className="w-4 h-4 text-white" />
@@ -980,10 +992,10 @@ const TeamManager: React.FC<TeamManagerProps> = ({
       </div>
 
       {/* Team Status */}
-      <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+      <div className="px-3 sm:px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between flex-wrap gap-1">
         <div className="flex items-center gap-2">
           <span
-            className={`px-2 py-1 rounded-full text-xs font-medium ${
+            className={`px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${
               team.status === 'complete'
                 ? 'bg-green-100 text-green-700'
                 : team.status === 'forming'
@@ -995,9 +1007,9 @@ const TeamManager: React.FC<TeamManagerProps> = ({
           </span>
         </div>
         {deadlinePassed && (
-          <span className="text-xs text-red-600 flex items-center gap-1">
+          <span className="text-[10px] sm:text-xs text-red-600 flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            Deadline passed - Team is locked
+            Locked - Event starts soon
           </span>
         )}
       </div>

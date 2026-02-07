@@ -16,7 +16,13 @@ import {
   Users,
   Trash2,
   CheckSquare,
-  Square
+  Square,
+  GraduationCap,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  AlertTriangle,
+  CheckCircle
 } from 'lucide-react';
 
 interface User {
@@ -90,11 +96,15 @@ const AdminUsers: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   
   // Tab state for My College / Other Colleges
-  const [activeTab, setActiveTab] = useState<'myCollege' | 'otherColleges'>('myCollege');
+  const [activeTab, setActiveTab] = useState<'myCollege' | 'otherColleges' | 'promotions'>('myCollege');
   
   // Bulk delete state for other colleges
   const [selectedOtherCollegeUsers, setSelectedOtherCollegeUsers] = useState<string[]>([]);
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+  
+  // Promotion/demotion state
+  const [promotionLoading, setPromotionLoading] = useState(false);
+  const [promotionResults, setPromotionResults] = useState<{year: number; count: number}[]>([]);
   
   // Registration approval settings
   const [requireApproval, setRequireApproval] = useState(false);
@@ -609,6 +619,47 @@ const AdminUsers: React.FC = () => {
     return college.toLowerCase().trim().replace(/\s+/g, ' ');
   };
   
+  // Get student counts by year
+  const studentsByYear = {
+    1: users.filter(u => u.role === 'student' && Number(u.year) === 1).length,
+    2: users.filter(u => u.role === 'student' && Number(u.year) === 2).length,
+    3: users.filter(u => u.role === 'student' && Number(u.year) === 3).length,
+    4: users.filter(u => u.role === 'student' && Number(u.year) === 4).length,
+  };
+
+  // Bulk promote/demote handler
+  const handleBulkYearChange = async (fromYear: number, toYear: number, action: 'promote' | 'demote') => {
+    const actionLabel = action === 'promote' ? 'Promote' : 'Demote';
+    const count = studentsByYear[fromYear as keyof typeof studentsByYear];
+    if (count === 0) {
+      showToast(`No Year ${fromYear} students to ${action}.`, 'error');
+      return;
+    }
+    if (!confirm(`Are you sure you want to ${action} all ${count} Year ${fromYear} students to Year ${toYear}? This will update their study year.`)) {
+      return;
+    }
+    setPromotionLoading(true);
+    try {
+      const response = await fetch('/api/admin/students/promote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromYear, toYear, action }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        showToast(data.message);
+        setPromotionResults(prev => [...prev, { year: fromYear, count: data.count }]);
+        fetchUsers(); // Refresh user list
+      } else {
+        showToast(data.error || `Failed to ${action} students`, 'error');
+      }
+    } catch (_error) {
+      showToast(`Failed to ${action} students`, 'error');
+    } finally {
+      setPromotionLoading(false);
+    }
+  };
+
   // Check if a college matches our college (handles variations)
   const isMyCollege = (college: string): boolean => {
     if (!college) return false;
@@ -855,21 +906,21 @@ const AdminUsers: React.FC = () => {
 
         {/* Tabs for My College / Other Colleges */}
         <div className="mb-4 sm:mb-6">
-          <div className="flex flex-wrap gap-2 p-1 bg-gray-100 rounded-lg">
+          <div className="flex overflow-x-auto gap-1.5 sm:gap-2 p-1 bg-gray-100 rounded-lg scrollbar-thin scrollbar-thumb-gray-300">
             <button
               onClick={() => {
                 setActiveTab('myCollege');
                 setSelectedOtherCollegeUsers([]);
               }}
-              className={`flex-1 min-w-[120px] sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium rounded-md transition-all ${
+              className={`flex-shrink-0 flex items-center justify-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-sm font-medium rounded-md transition-all whitespace-nowrap ${
                 activeTab === 'myCollege'
                   ? 'bg-white text-blue-600 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="hidden xs:inline">My College</span>
-              <span className="xs:hidden">Mine</span>
+              <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="hidden sm:inline">My College</span>
+              <span className="sm:hidden">Mine</span>
               <span className={`ml-1 px-1.5 sm:px-2 py-0.5 text-xs rounded-full ${
                 activeTab === 'myCollege' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'
               }`}>
@@ -878,20 +929,32 @@ const AdminUsers: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('otherColleges')}
-              className={`flex-1 min-w-[120px] sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium rounded-md transition-all ${
+              className={`flex-shrink-0 flex items-center justify-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-sm font-medium rounded-md transition-all whitespace-nowrap ${
                 activeTab === 'otherColleges'
                   ? 'bg-white text-purple-600 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="hidden xs:inline">Other Colleges</span>
-              <span className="xs:hidden">Others</span>
+              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Other Colleges</span>
+              <span className="sm:hidden">Others</span>
               <span className={`ml-1 px-1.5 sm:px-2 py-0.5 text-xs rounded-full ${
                 activeTab === 'otherColleges' ? 'bg-purple-100 text-purple-700' : 'bg-gray-200 text-gray-600'
               }`}>
                 {otherCollegeUsers.length}
               </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('promotions')}
+              className={`flex-shrink-0 flex items-center justify-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-sm font-medium rounded-md transition-all whitespace-nowrap ${
+                activeTab === 'promotions'
+                  ? 'bg-white text-green-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Promotions</span>
+              <span className="sm:hidden">Promote</span>
             </button>
           </div>
         </div>
@@ -941,6 +1004,113 @@ const AdminUsers: React.FC = () => {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Promotions Tab */}
+        {activeTab === 'promotions' && (
+          <div className="space-y-4 sm:space-y-6">
+            {/* Header */}
+            <div className="bg-white shadow rounded-lg p-3 sm:p-6">
+              <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 mb-3 sm:mb-4">
+                <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg flex-shrink-0">
+                  <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-base sm:text-xl font-bold text-gray-900">Student Year Promotions</h2>
+                  <p className="text-xs sm:text-sm text-gray-600 leading-tight sm:leading-normal">Promote or demote students in bulk when semester/year-end exams are completed</p>
+                </div>
+              </div>
+
+              {/* Student Year Overview */}
+              <div className="grid grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
+                {[1, 2, 3, 4].map(year => (
+                  <div key={year} className="bg-gray-50 rounded-lg p-2 sm:p-4 text-center border border-gray-200">
+                    <div className="text-lg sm:text-3xl font-bold text-gray-900">{studentsByYear[year as keyof typeof studentsByYear]}</div>
+                    <div className="text-[10px] sm:text-sm text-gray-600 mt-0.5 sm:mt-1">
+                      {year}{year === 1 ? 'st' : year === 2 ? 'nd' : year === 3 ? 'rd' : 'th'} Year
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Warning */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2.5 sm:p-4 mb-4 sm:mb-6">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs sm:text-sm font-medium text-yellow-800">Important</p>
+                    <p className="text-[11px] sm:text-sm text-yellow-700 mt-0.5 sm:mt-1 leading-relaxed">
+                      Promotions affect <strong>all students</strong> of the selected year. When promoting, start from the highest year (3rd → 4th) and work downwards. When demoting, start from the lowest year.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Promote Section */}
+              <div className="mb-4 sm:mb-6">
+                <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3 flex items-center gap-1.5 sm:gap-2">
+                  <ArrowUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+                  Promote Students
+                </h3>
+                <div className="grid grid-cols-1 xs:grid-cols-3 gap-2 sm:gap-3">
+                  {[{from: 3, to: 4}, {from: 2, to: 3}, {from: 1, to: 2}].map(({from, to}) => (
+                    <button
+                      key={`promote-${from}`}
+                      onClick={() => handleBulkYearChange(from, to, 'promote')}
+                      disabled={promotionLoading || studentsByYear[from as keyof typeof studentsByYear] === 0}
+                      className={`flex items-center justify-between p-3 sm:p-4 rounded-lg border-2 transition-all active:scale-[0.98] ${
+                        studentsByYear[from as keyof typeof studentsByYear] === 0
+                          ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                          : 'border-green-200 bg-green-50 text-green-800 hover:bg-green-100 hover:border-green-300'
+                      } ${promotionLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <div className="text-left">
+                        <div className="text-xs sm:text-sm font-semibold">
+                          {from}{from === 1 ? 'st' : from === 2 ? 'nd' : 'rd'} → {to}{to === 2 ? 'nd' : to === 3 ? 'rd' : 'th'} Year
+                        </div>
+                        <div className="text-[10px] sm:text-xs mt-0.5">
+                          {studentsByYear[from as keyof typeof studentsByYear]} student{studentsByYear[from as keyof typeof studentsByYear] !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                      <ArrowUp className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Demote Section */}
+              <div>
+                <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3 flex items-center gap-1.5 sm:gap-2">
+                  <ArrowDown className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
+                  Demote Students
+                </h3>
+                <div className="grid grid-cols-1 xs:grid-cols-3 gap-2 sm:gap-3">
+                  {[{from: 2, to: 1}, {from: 3, to: 2}, {from: 4, to: 3}].map(({from, to}) => (
+                    <button
+                      key={`demote-${from}`}
+                      onClick={() => handleBulkYearChange(from, to, 'demote')}
+                      disabled={promotionLoading || studentsByYear[from as keyof typeof studentsByYear] === 0}
+                      className={`flex items-center justify-between p-3 sm:p-4 rounded-lg border-2 transition-all active:scale-[0.98] ${
+                        studentsByYear[from as keyof typeof studentsByYear] === 0
+                          ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                          : 'border-red-200 bg-red-50 text-red-800 hover:bg-red-100 hover:border-red-300'
+                      } ${promotionLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <div className="text-left">
+                        <div className="text-xs sm:text-sm font-semibold">
+                          {from}{from === 2 ? 'nd' : from === 3 ? 'rd' : 'th'} → {to}{to === 1 ? 'st' : to === 2 ? 'nd' : 'rd'} Year
+                        </div>
+                        <div className="text-[10px] sm:text-xs mt-0.5">
+                          {studentsByYear[from as keyof typeof studentsByYear]} student{studentsByYear[from as keyof typeof studentsByYear] !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                      <ArrowDown className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}

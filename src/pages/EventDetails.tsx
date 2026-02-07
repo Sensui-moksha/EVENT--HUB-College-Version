@@ -1858,7 +1858,21 @@ const EventDetails: React.FC = () => {
                 <div className={`mt-4 sm:mt-6 p-3 sm:p-4 rounded-lg ${
                   event.status === 'completed'
                     ? 'bg-green-50 border-2 border-green-300' 
-                    : new Date() > new Date(event.date) 
+                    : (() => {
+                        const now = new Date();
+                        const evtDate = new Date(event.date);
+                        let endDT = new Date(evtDate);
+                        if ((event as any).endTime) {
+                          const [h, m] = (event as any).endTime.split(':').map(Number);
+                          endDT.setHours(h || 23, m || 59, 59, 999);
+                        } else if (event.time) {
+                          const [h, m] = event.time.split(':').map(Number);
+                          endDT.setHours((h || 0) + 3, m || 0, 0, 0);
+                        } else {
+                          endDT.setHours(23, 59, 59, 999);
+                        }
+                        return now > endDT;
+                      })()
                     ? 'bg-gray-50 border border-gray-200' 
                     : 'bg-yellow-50 border border-yellow-200'
                 }`}>
@@ -1872,7 +1886,21 @@ const EventDetails: React.FC = () => {
                         This event has ended • Event date: {format(new Date(event.date), 'MMM dd, yyyy')}
                       </p>
                     </>
-                  ) : new Date() > new Date(event.date) ? (
+                  ) : (() => {
+                      const now = new Date();
+                      const evtDate = new Date(event.date);
+                      let endDT = new Date(evtDate);
+                      if ((event as any).endTime) {
+                        const [h, m] = (event as any).endTime.split(':').map(Number);
+                        endDT.setHours(h || 23, m || 59, 59, 999);
+                      } else if (event.time) {
+                        const [h, m] = event.time.split(':').map(Number);
+                        endDT.setHours((h || 0) + 3, m || 0, 0, 0);
+                      } else {
+                        endDT.setHours(23, 59, 59, 999);
+                      }
+                      return now > endDT;
+                    })() ? (
                     <>
                       <p className="text-xs sm:text-sm text-gray-700 font-semibold flex items-center gap-2">
                         <CheckCircle className="w-4 h-4 text-gray-600" />
@@ -2214,7 +2242,8 @@ const EventDetails: React.FC = () => {
                           <TeamManager
                             eventId={id || ''}
                             eventTitle={event.title}
-                            registrationDeadline={event.registrationDeadline}
+                            eventDate={event.date}
+                            eventTime={event.time}
                             minTeamSize={event.minTeamSize || 2}
                             maxTeamSize={event.maxTeamSize || 4}
                           />

@@ -5,6 +5,7 @@ interface ConnectionContextType {
   isOnline: boolean;
   isBackendConnected: boolean;
   lastError: string | null;
+  hasCheckedOnce: boolean;
   checkConnection: () => Promise<boolean>;
   clearError: () => void;
 }
@@ -27,6 +28,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isBackendConnected, setIsBackendConnected] = useState(true);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [hasCheckedOnce, setHasCheckedOnce] = useState(false);
   const checkInProgress = useRef(false);
   const lastCheckTime = useRef(0);
 
@@ -55,11 +57,13 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       if (response.ok) {
         setIsBackendConnected(true);
         setLastError(null);
+        setHasCheckedOnce(true);
         checkInProgress.current = false;
         return true;
       } else {
         setIsBackendConnected(false);
         setLastError('Server returned an error. Please try again later.');
+        setHasCheckedOnce(true);
         checkInProgress.current = false;
         return false;
       }
@@ -74,6 +78,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         setLastError('Unable to connect to server. Database may be unavailable due to slow internet.');
       }
       
+      setHasCheckedOnce(true);
       checkInProgress.current = false;
       return false;
     }
@@ -123,6 +128,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     isOnline,
     isBackendConnected,
     lastError,
+    hasCheckedOnce,
     checkConnection,
     clearError,
   };

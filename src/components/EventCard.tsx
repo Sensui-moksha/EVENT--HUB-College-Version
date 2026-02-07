@@ -89,8 +89,22 @@ const EventCard: React.FC<EventCardProps> = ({ event }) => {
   const isRegistrationOpen = new Date() < event.registrationDeadline && event.status === 'upcoming';
   const isFull = event.currentParticipants >= event.maxParticipants;
   
-  // Check if event date has passed (event should be completed)
-  const eventDatePassed = new Date() > new Date(event.date);
+  // Check if event has actually ended (considering time, not just date)
+  const eventDatePassed = (() => {
+    const now = new Date();
+    const eventDate = new Date(event.date);
+    let eventEndDateTime = new Date(eventDate);
+    if ((event as any).endTime) {
+      const [h, m] = (event as any).endTime.split(':').map(Number);
+      eventEndDateTime.setHours(h || 23, m || 59, 59, 999);
+    } else if (event.time) {
+      const [h, m] = event.time.split(':').map(Number);
+      eventEndDateTime.setHours((h || 0) + 3, m || 0, 0, 0);
+    } else {
+      eventEndDateTime.setHours(23, 59, 59, 999);
+    }
+    return now > eventEndDateTime;
+  })();
 
   // Detect if event has sub-events using several possible shapes from backend
   const subEventCount: number =

@@ -1727,6 +1727,30 @@ const buildNotificationData = (event, extraData = {}) => {
   return data;
 };
 
+// --- Waitlist notification throttle for organizers/admins (max 2 per day per event) ---
+const waitlistNotificationTracker = new Map(); // key: `${organizerId}_${eventId}`, value: { count, date }
+
+const shouldNotifyOrganizerWaitlist = (organizerId, eventId) => {
+  const key = `${organizerId}_${eventId}`;
+  const today = new Date().toDateString();
+  const entry = waitlistNotificationTracker.get(key);
+  
+  if (!entry || entry.date !== today) {
+    // New day or first time - reset and allow
+    waitlistNotificationTracker.set(key, { count: 1, date: today });
+    return true;
+  }
+  
+  if (entry.count < 2) {
+    // Under the limit for today
+    entry.count++;
+    return true;
+  }
+  
+  // Already sent 2 notifications today for this event
+  return false;
+};
+
 // --- Utility function to create and emit notifications ---
 const notifyUser = async (req, userId, type, message, data = {}, priority = 'normal') => {
   try {
@@ -2631,8 +2655,8 @@ app.post('/api/events/register-multiple', async (req, res) => {
               );
             }
           }
-        } else if (capacityPercentage >= 80 && event.currentParticipants - 1 < event.maxParticipants * 0.8) {
-          // Just crossed 80% threshold - notify registered users
+        } else if (event.maxParticipants - event.currentParticipants === 5 && event.maxParticipants - (event.currentParticipants - 1) > 5) {
+          // Exactly 5 spots remaining and just crossed that threshold - notify registered users (only once)
           const allRegistrations = await Registration.find({ eventId });
           for (const reg of allRegistrations) {
             if (reg.userId.toString() !== userId) {
@@ -2640,7 +2664,7 @@ app.post('/api/events/register-multiple', async (req, res) => {
                 req,
                 reg.userId,
                 'capacity_alert',
-                `The event '${event.title}' is filling up fast! Only ${event.maxParticipants - event.currentParticipants} spots left.`,
+                `Hurry! Only 5 spots left for '${event.title}'! Register soon before it's full.`,
                 buildNotificationData(event)
               );
             }
@@ -3034,20 +3058,27 @@ app.post('/api/events/:eventId/register', async (req, res) => {
         { eventId: event._id, eventTitle: event.title, eventImage: event.image }
       ).catch(err => console.error('Waitlist notification error:', err.message));
       
-      // Background: Notify event organizer about new waiting list entry (non-blocking)
-      notifyUser(
-        req,
-        event.organizerId,
-        'new_waitlist_entry',
-        `${user.name} is waiting for approval to join '${event.title}'`,
-        { 
-          eventId: event._id, 
-          eventTitle: event.title, 
-          eventImage: event.image,
-          relatedUser: user._id,
-          registrationId: newRegistration._id
-        }
-      ).catch(err => console.error('Organizer notification error:', err.message));
+      // Background: Notify event organizer about new waiting list entry (throttled: max 2 per day)
+      if (shouldNotifyOrganizerWaitlist(event.organizerId, event._id)) {
+        // Count pending registrations for context
+        const pendingCount = await Registration.countDocuments({ eventId: event._id, approvalStatus: 'pending' });
+        notifyUser(
+          req,
+          event.organizerId,
+          'new_waitlist_entry',
+          `${user.name} is waiting for approval to join '${event.title}' (${pendingCount} pending total)`,
+          { 
+            eventId: event._id, 
+            eventTitle: event.title, 
+            eventImage: event.image,
+            relatedUser: user._id,
+            registrationId: newRegistration._id,
+            pendingCount
+          }
+        ).catch(err => console.error('Organizer notification error:', err.message));
+      } else {
+        console.log(`Throttled waitlist notification for organizer ${event.organizerId} on event ${event._id} (max 2/day reached)`);
+      }
     }
   } catch (error) {
     console.error('Registration error:', error);
@@ -3712,19 +3743,8 @@ app.post('/api/events/:eventId/unregister', async (req, res) => {
         'urgent'
       );
     } else if (event.currentParticipants < event.maxParticipants) {
-      // Notify other registered users that a spot is available
-      const otherUsers = await Registration.find({ eventId }).limit(10);
-      for (const reg of otherUsers) {
-        if (reg.userId.toString() !== userId) {
-          await notifyUser(
-            req,
-            reg.userId,
-            'spot_available',
-            `A spot just opened up for '${event.title}'! Only ${event.maxParticipants - event.currentParticipants} spots left.`,
-            { eventId, eventTitle: event.title, eventImage: event.image }
-          );
-        }
-      }
+      // Spot opened up but no waitlist - no notification needed
+      // (notifications are only sent when 5 spots remain during registration)
     }
 
     // --- NOTIFICATION ---
@@ -4475,6 +4495,46 @@ app.put('/api/users/:id', async (req, res) => {
   } catch (err) {
     console.error('User update error:', err);
     res.status(400).json({ error: 'Failed to update user.' });
+  }
+});
+
+// Bulk promote/demote students by year (admin only)
+app.post('/api/admin/students/promote', async (req, res) => {
+  try {
+    const { fromYear, toYear, action } = req.body;
+    // action: 'promote' or 'demote'
+    
+    if (!fromYear || !toYear || !action) {
+      return res.status(400).json({ error: 'fromYear, toYear, and action are required.' });
+    }
+    
+    if (toYear < 1 || toYear > 4 || fromYear < 1 || fromYear > 4) {
+      return res.status(400).json({ error: 'Year must be between 1 and 4.' });
+    }
+    
+    if (action === 'promote' && toYear !== fromYear + 1) {
+      return res.status(400).json({ error: 'Can only promote to the next year.' });
+    }
+    
+    if (action === 'demote' && toYear !== fromYear - 1) {
+      return res.status(400).json({ error: 'Can only demote to the previous year.' });
+    }
+    
+    const result = await User.updateMany(
+      { role: 'student', year: fromYear },
+      { $set: { year: toYear } }
+    );
+    
+    console.log(`📚 Admin bulk ${action}: ${result.modifiedCount} students moved from Year ${fromYear} to Year ${toYear}`);
+    
+    res.json({ 
+      success: true, 
+      message: `Successfully ${action}d ${result.modifiedCount} student(s) from Year ${fromYear} to Year ${toYear}.`,
+      count: result.modifiedCount
+    });
+  } catch (err) {
+    console.error('Bulk promote/demote error:', err);
+    res.status(500).json({ error: 'Failed to update students.' });
   }
 });
 
@@ -6745,13 +6805,11 @@ cron.schedule('*/5 * * * *', async () => {
   try {
     const now = new Date();
     
+    // Auto-complete ALL events past their end time, including those with prizes
+    // Organizers/admins can still add winners after the event is marked completed
     const eventsToComplete = await Event.find({
       status: { $in: ['upcoming', 'ongoing'] },
-      completedAt: { $exists: false },
-      $or: [
-        { prizes: { $exists: false } },
-        { prizes: { $size: 0 } }
-      ]
+      completedAt: { $exists: false }
     });
     
     let completedCount = 0;
@@ -6807,21 +6865,28 @@ cron.schedule('*/5 * * * *', async () => {
     
     for (const event of eventsToMarkOngoing) {
       const eventDate = new Date(event.date);
-      let eventEndDateTime = eventDate;
+      let eventEndDateTime = new Date(eventDate);
+      let eventStartDateTime = new Date(eventDate);
       
+      // Calculate event start time
+      if (event.time) {
+        const [startHour, startMin] = event.time.split(':').map(Number);
+        eventStartDateTime.setHours(startHour || 0, startMin || 0, 0, 0);
+      }
+      
+      // Calculate event end time
       if (event.endTime) {
         const [endHour, endMin] = event.endTime.split(':').map(Number);
-        eventEndDateTime = new Date(eventDate);
         eventEndDateTime.setHours(endHour || 23, endMin || 59, 59, 999);
       } else if (event.time) {
         const [startHour, startMin] = event.time.split(':').map(Number);
-        eventEndDateTime = new Date(eventDate);
         eventEndDateTime.setHours((startHour || 0) + 3, startMin || 0, 0, 0);
       } else {
         eventEndDateTime.setHours(23, 59, 59, 999);
       }
       
-      if (now <= eventEndDateTime) {
+      // Only mark as ongoing if current time is >= start time AND <= end time
+      if (now >= eventStartDateTime && now <= eventEndDateTime) {
         event.status = 'ongoing';
         await event.save();
         console.log(`🔄 Marked event as ongoing: "${event.title}"`);
@@ -9249,8 +9314,14 @@ app.patch('/api/sub-events/:subEventId/teams/:teamId/rename', async (req, res) =
     }
 
     const subEvent = await SubEvent.findById(subEventId);
-    if (new Date() > new Date(subEvent.registrationDeadline)) {
-      return res.status(400).json({ error: 'Cannot rename team after registration deadline' });
+    const subRenameStartDT = new Date(subEvent.date || subEvent.registrationDeadline);
+    if (subEvent.time) {
+      const [h, m] = subEvent.time.split(':').map(Number);
+      subRenameStartDT.setHours(h || 0, m || 0, 0, 0);
+    }
+    const subRenameCutoff = new Date(subRenameStartDT.getTime() - 5 * 60 * 60 * 1000);
+    if (new Date() > subRenameCutoff) {
+      return res.status(400).json({ error: 'Cannot rename team (less than 5 hours before event start)' });
     }
 
     const existingTeam = await SubEventTeam.findOne({ 
@@ -9289,8 +9360,14 @@ app.post('/api/sub-events/:subEventId/teams/:teamId/invite-to-event', async (req
     }
 
     const subEvent = await SubEvent.findById(subEventId);
-    if (new Date() > new Date(subEvent.registrationDeadline)) {
-      return res.status(400).json({ error: 'Registration deadline has passed' });
+    const subInvStartDT = new Date(subEvent.date || subEvent.registrationDeadline);
+    if (subEvent.time) {
+      const [h, m] = subEvent.time.split(':').map(Number);
+      subInvStartDT.setHours(h || 0, m || 0, 0, 0);
+    }
+    const subInvCutoff = new Date(subInvStartDT.getTime() - 5 * 60 * 60 * 1000);
+    if (new Date() > subInvCutoff) {
+      return res.status(400).json({ error: 'Cannot invite members (less than 5 hours before event start)' });
     }
 
     const maxMembers = subEvent.maxTeamSize || 4;
@@ -9787,9 +9864,15 @@ app.post('/api/events/:eventId/teams', async (req, res) => {
       return res.status(404).json({ error: 'Event not found' });
     }
 
-    // Check if registration deadline has passed
-    if (new Date() > new Date(event.registrationDeadline)) {
-      return res.status(400).json({ error: 'Registration deadline has passed. Cannot create team.' });
+    // Check if team creation is still allowed (until 5 hours before event start)
+    const eventStartDateTime = new Date(event.date);
+    if (event.time) {
+      const [h, m] = event.time.split(':').map(Number);
+      eventStartDateTime.setHours(h || 0, m || 0, 0, 0);
+    }
+    const teamCutoff = new Date(eventStartDateTime.getTime() - 5 * 60 * 60 * 1000);
+    if (new Date() > teamCutoff) {
+      return res.status(400).json({ error: 'Team creation is closed (less than 5 hours before event start).' });
     }
 
     // Check if user exists
@@ -9985,10 +10068,16 @@ app.patch('/api/events/:eventId/teams/:teamId/rename', async (req, res) => {
       return res.status(403).json({ error: 'Only the team leader can rename the team' });
     }
 
-    // Check registration deadline
+    // Check team edit cutoff (5 hours before event start)
     const event = await Event.findById(eventId);
-    if (new Date() > new Date(event.registrationDeadline)) {
-      return res.status(400).json({ error: 'Cannot rename team after registration deadline' });
+    const renameStartDT = new Date(event.date);
+    if (event.time) {
+      const [h, m] = event.time.split(':').map(Number);
+      renameStartDT.setHours(h || 0, m || 0, 0, 0);
+    }
+    const renameCutoff = new Date(renameStartDT.getTime() - 5 * 60 * 60 * 1000);
+    if (new Date() > renameCutoff) {
+      return res.status(400).json({ error: 'Cannot rename team (less than 5 hours before event start)' });
     }
 
     // Check if new name is unique
@@ -10061,9 +10150,15 @@ app.post('/api/events/:eventId/teams/:teamId/complete', async (req, res) => {
       return res.status(404).json({ error: 'Event not found' });
     }
 
-    // Check registration deadline
-    if (new Date() > new Date(event.registrationDeadline)) {
-      return res.status(400).json({ error: 'Cannot complete registration after deadline' });
+    // Check team edit cutoff (5 hours before event start)
+    const completeStartDT = new Date(event.date);
+    if (event.time) {
+      const [h, m] = event.time.split(':').map(Number);
+      completeStartDT.setHours(h || 0, m || 0, 0, 0);
+    }
+    const completeCutoff = new Date(completeStartDT.getTime() - 5 * 60 * 60 * 1000);
+    if (new Date() > completeCutoff) {
+      return res.status(400).json({ error: 'Cannot complete registration (less than 5 hours before event start)' });
     }
 
     // Count team members (all members in the array are confirmed)
@@ -10434,10 +10529,16 @@ app.post('/api/events/:eventId/teams/:teamId/remove-member', async (req, res) =>
       return res.status(400).json({ error: 'Team leader cannot be removed. Delete the team instead.' });
     }
 
-    // Check registration deadline
+    // Check team edit cutoff (5 hours before event start)
     const event = await Event.findById(eventId);
-    if (new Date() > new Date(event.registrationDeadline)) {
-      return res.status(400).json({ error: 'Cannot modify team after registration deadline' });
+    const removeStartDT = new Date(event.date);
+    if (event.time) {
+      const [h, m] = event.time.split(':').map(Number);
+      removeStartDT.setHours(h || 0, m || 0, 0, 0);
+    }
+    const removeCutoff = new Date(removeStartDT.getTime() - 5 * 60 * 60 * 1000);
+    if (new Date() > removeCutoff) {
+      return res.status(400).json({ error: 'Cannot modify team (less than 5 hours before event start)' });
     }
 
     // Check if member exists in team
