@@ -6000,7 +6000,9 @@ app.put('/api/events/:id', async (req, res) => {
     // ========== BACKGROUND PROCESSING (after response sent) ==========
     
     // --- NOTIFICATION (background) ---
-    if (oldEvent && event) {
+    // Skip notifications for completed/cancelled events (editing after completion should be silent)
+    const isCompletedOrCancelled = oldEvent && (oldEvent.status === 'completed' || oldEvent.status === 'cancelled');
+    if (oldEvent && event && !isCompletedOrCancelled) {
       (async () => {
         try {
           const registrations = await Registration.find({ eventId: req.params.id })

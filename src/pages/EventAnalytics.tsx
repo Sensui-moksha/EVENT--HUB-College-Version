@@ -9,7 +9,6 @@ import {
   Calendar,
   TrendingUp,
   Users,
-  UserCheck,
   AlertCircle,
   BarChart3,
   PieChart,
@@ -404,7 +403,7 @@ const EventAnalytics: React.FC = () => {
               {activeTab === 'overview' && (
                 <>
                   {/* Key Metrics Cards */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {/* Total Events */}
                     <motion.div
                       variants={itemVariants}
@@ -458,35 +457,6 @@ const EventAnalytics: React.FC = () => {
                           <span className="flex items-center text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
                             <TrendingUp className="w-3 h-3 mr-1" />
                             {analytics.averageRegistrationsPerEvent.toFixed(1)}/event
-                          </span>
-                        </div>
-                      </div>
-                    </motion.div>
-
-                    {/* Attendance Rate */}
-                    <motion.div
-                      variants={itemVariants}
-                      whileHover={cardHover}
-                      className="bg-white rounded-2xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100 relative overflow-hidden group"
-                    >
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500" />
-                      <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="p-2.5 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-lg shadow-purple-500/30">
-                            <UserCheck className="w-5 h-5 text-white" />
-                          </div>
-                          <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
-                            Attendance
-                          </span>
-                        </div>
-                        <div className="text-3xl font-bold text-gray-900 mb-1">
-                          {insights?.attendanceRate.toFixed(1) || 0}%
-                        </div>
-                        <p className="text-sm text-gray-500">Attendance Rate</p>
-                        <div className="mt-3 flex items-center gap-2 text-xs">
-                          <span className="flex items-center text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
-                            <Users className="w-3 h-3 mr-1" />
-                            {analytics.totalParticipants} attended
                           </span>
                         </div>
                       </div>

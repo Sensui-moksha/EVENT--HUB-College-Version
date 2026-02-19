@@ -9,7 +9,7 @@ import { Search, Filter, Calendar, Users, Trophy, Grid, List } from 'lucide-reac
 import { pageVariants, staggerContainerVariants, listItemVariants } from '../utils/animations';
 
 const Events: React.FC = () => {
-  const { events } = useEvents();
+  const { events, registrations } = useEvents();
   const { user } = useAuth();
   
   // Stable user ID to prevent unnecessary re-renders
@@ -102,10 +102,14 @@ const Events: React.FC = () => {
     });
   }, [events, searchTerm, selectedCategory, selectedStatus, user]);
 
+  // Compute participant counts from registrations (more authoritative than event.currentParticipants)
+  const approvedOrRegistered = (r: { approvalStatus?: string; status?: string }) => r.approvalStatus === 'approved' || r.status === 'registered';
+  const totalParticipantsFromRegistrations = registrations.filter(approvedOrRegistered).length;
+
   const eventStats = {
     total: filteredEvents.length,
     upcoming: filteredEvents.filter(e => e.status === 'upcoming').length,
-    participants: filteredEvents.reduce((sum, event) => sum + event.currentParticipants, 0),
+    participants: totalParticipantsFromRegistrations > 0 ? totalParticipantsFromRegistrations : filteredEvents.reduce((sum, event) => sum + event.currentParticipants, 0),
   };
 
   const eventsRef = useRef<HTMLDivElement | null>(null);

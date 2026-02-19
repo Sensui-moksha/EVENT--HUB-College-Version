@@ -53,6 +53,10 @@ const Home: React.FC = () => {
   // Count registrations only for active events
   const activeRegistrationsCount = registrations.filter(r => activeEventIds.includes(r.eventId)).length;
 
+  // Compute participant counts from registrations (more authoritative than event.currentParticipants)
+  const approvedOrRegistered = (r: { approvalStatus?: string; status?: string }) => r.approvalStatus === 'approved' || r.status === 'registered';
+  const totalParticipantsFromRegistrations = registrations.filter(approvedOrRegistered).length;
+
   const stats = [
     {
       icon: Zap,
@@ -71,7 +75,7 @@ const Home: React.FC = () => {
     {
       icon: Users,
       label: 'Total Participants',
-      value: events.reduce((sum, event) => sum + event.currentParticipants, 0),
+      value: totalParticipantsFromRegistrations > 0 ? totalParticipantsFromRegistrations : events.reduce((sum, event) => sum + event.currentParticipants, 0),
       color: 'text-green-600',
       bgColor: 'bg-green-100',
     },
