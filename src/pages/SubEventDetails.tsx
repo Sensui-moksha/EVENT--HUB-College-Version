@@ -163,12 +163,7 @@ const SubEventDetails: React.FC = () => {
 
   const fetchSubEvent = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/sub-events/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await fetch(`${API_BASE_URL}/api/sub-events/${id}`);
 
       if (response.ok) {
         const data = await response.json();
@@ -189,14 +184,8 @@ const SubEventDetails: React.FC = () => {
     if (!userId) return;
     
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(
-        `${API_BASE_URL}/api/sub-events/${id}/access-check/${userId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
+        `${API_BASE_URL}/api/sub-events/${id}/access-check/${userId}`
       );
 
       if (response.ok) {
@@ -212,14 +201,8 @@ const SubEventDetails: React.FC = () => {
     if (!userId) return;
 
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(
-        `${API_BASE_URL}/api/sub-events/${id}/registration/${userId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
+        `${API_BASE_URL}/api/sub-events/${id}/registration/${userId}`
       );
 
       if (response.ok) {
@@ -233,14 +216,8 @@ const SubEventDetails: React.FC = () => {
 
   const fetchAttendees = async () => {
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(
-        `${API_BASE_URL}/api/sub-events/${id}/registrations`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
+        `${API_BASE_URL}/api/sub-events/${id}/registrations`
       );
 
       if (response.ok) {
@@ -255,14 +232,8 @@ const SubEventDetails: React.FC = () => {
 
   const fetchWaitlist = async () => {
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(
-        `${API_BASE_URL}/api/sub-events/${id}/waitlist`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
+        `${API_BASE_URL}/api/sub-events/${id}/waitlist`
       );
 
       if (response.ok) {
@@ -278,14 +249,8 @@ const SubEventDetails: React.FC = () => {
     if (!userId) return;
 
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(
-        `${API_BASE_URL}/api/sub-events/${id}/waitlist/${userId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
+        `${API_BASE_URL}/api/sub-events/${id}/waitlist/${userId}`
       );
 
       if (response.ok) {
@@ -348,12 +313,10 @@ const SubEventDetails: React.FC = () => {
     
     setCompletingEvent(true);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/sub-events/${id}/complete`, {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ userId })
       });
@@ -378,12 +341,10 @@ const SubEventDetails: React.FC = () => {
     if (!user || !id) return;
     
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/sub-events/${id}/reopen`, {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ userId })
       });
@@ -406,12 +367,10 @@ const SubEventDetails: React.FC = () => {
     
     setAddingSpotReg(true);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/sub-events/${id}/spot-registrations`, {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           userId,
@@ -446,7 +405,6 @@ const SubEventDetails: React.FC = () => {
     
     setAddingWinner(true);
     try {
-      const token = localStorage.getItem('token');
       const body: Record<string, unknown> = {
         userId,
         position: selectedWinnerPosition,
@@ -462,8 +420,7 @@ const SubEventDetails: React.FC = () => {
       const response = await fetch(`${API_BASE_URL}/api/sub-events/${id}/winners`, {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(body)
       });
@@ -490,12 +447,10 @@ const SubEventDetails: React.FC = () => {
     if (!user || !id) return;
     
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/sub-events/${id}/winners/${winnerId}`, {
         method: 'DELETE',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ userId })
       });
@@ -543,14 +498,12 @@ const SubEventDetails: React.FC = () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(
         `${API_BASE_URL}/api/sub-events/${id}/register`,
         {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({ userId })
         }
@@ -619,14 +572,12 @@ const SubEventDetails: React.FC = () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(
         `${API_BASE_URL}/api/sub-events/${id}/unregister`,
         {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({ userId })
         }
@@ -659,14 +610,10 @@ const SubEventDetails: React.FC = () => {
 
     try {
       setDeleting(true);
-      const token = localStorage.getItem('token');
       const response = await fetch(
         `${API_BASE_URL}/api/sub-events/${id}`,
         {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          method: 'DELETE'
         }
       );
 
@@ -695,14 +642,12 @@ const SubEventDetails: React.FC = () => {
     if (!id) return;
     
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(
         `${API_BASE_URL}/api/sub-events/${id}/waitlist/approve`,
         {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({ userId: waitlistUserId })
         }
@@ -735,14 +680,12 @@ const SubEventDetails: React.FC = () => {
     }
     
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(
         `${API_BASE_URL}/api/sub-events/${id}/waitlist/remove`,
         {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({ userId: waitlistUserId })
         }

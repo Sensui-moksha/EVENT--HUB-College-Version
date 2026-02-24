@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { apiRequest, getApiUrl, API_BASE_URL } from '../utils/api';
+import { apiRequest, getApiUrl, API_BASE_URL, getAuthHeaders } from '../utils/api';
 import { cacheManager, cacheKeys, CACHE_TTL, invalidateCache } from '../utils/cacheManager';
 
 // Type definitions
@@ -328,16 +328,16 @@ export const useGalleryUpload = (eventId: string) => {
             clearTimeout(timeoutId);
             completeResponse = await response.json();
             
-            if (completeResponse.success) {
+            if (completeResponse?.success) {
               break; // Success!
             }
             
             // Check if server says it's not retryable
-            if (completeResponse.retryable === false) {
-              throw new Error(completeResponse.error || 'Upload cannot be completed');
+            if (completeResponse?.retryable === false) {
+              throw new Error(completeResponse?.error || 'Upload cannot be completed');
             }
             
-            completeError = new Error(completeResponse.error || 'Failed to complete upload');
+            completeError = new Error(completeResponse?.error || 'Failed to complete upload');
             completeRetries--;
             
             if (completeRetries > 0) {
@@ -567,6 +567,9 @@ export const useGalleryUpload = (eventId: string) => {
 
             xhr.open('POST', url);
             xhr.withCredentials = true;
+            // Inject auth header for proxy-friendly fallback (interceptor only patches fetch, not XHR)
+            const authHeaders = getAuthHeaders();
+            Object.entries(authHeaders).forEach(([k, v]) => xhr.setRequestHeader(k, v));
             xhr.send(formData);
           });
 

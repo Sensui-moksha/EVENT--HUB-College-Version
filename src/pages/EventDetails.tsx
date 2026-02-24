@@ -278,12 +278,7 @@ const EventDetails: React.FC = () => {
     if (!userId || !id) return;
     
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/events/${id}/waitlist/status?userId=${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await fetch(`${API_BASE_URL}/api/events/${id}/waitlist/status?userId=${userId}`);
       
       if (response.ok) {
         const data = await response.json();
@@ -301,12 +296,7 @@ const EventDetails: React.FC = () => {
     if (!id || !userId) return;
     
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/events/${id}/waitlist?userId=${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await fetch(`${API_BASE_URL}/api/events/${id}/waitlist?userId=${userId}`);
 
       if (response.ok) {
         const data = await response.json();
@@ -1508,11 +1498,9 @@ const EventDetails: React.FC = () => {
 
     setWaitlistLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/events/${id}/waitlist/join`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
@@ -1551,12 +1539,8 @@ const EventDetails: React.FC = () => {
   const handleLeaveWaitlist = async () => {
     setWaitlistLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/events/${id}/waitlist/leave`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        method: 'DELETE'
       });
 
       if (response.ok) {
@@ -1628,12 +1612,10 @@ const EventDetails: React.FC = () => {
 
     setAnnouncementLoading(true);
     try {
-      const token = localStorage.getItem('token');
       // Backend expects POST /api/events/:eventId/announce (see server routes)
       const response = await fetch(`${API_BASE_URL}/api/events/${id}/announce`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({

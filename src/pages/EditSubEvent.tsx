@@ -89,12 +89,7 @@ const EditSubEvent: React.FC = () => {
   useEffect(() => {
     const fetchSubEvent = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${API_BASE_URL}/api/sub-events/${id}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const response = await fetch(`${API_BASE_URL}/api/sub-events/${id}`);
 
         if (response.ok) {
           const data = await response.json();
@@ -350,8 +345,6 @@ const EditSubEvent: React.FC = () => {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-
       const imageDimensions = localImageFile && !localImageDeleted 
         ? { imageWidth: localImageMeta.width, imageHeight: localImageMeta.height }
         : formData.imageUrl && urlImageDimensions.width 
@@ -428,8 +421,7 @@ const EditSubEvent: React.FC = () => {
         const response = await fetch(`${API_BASE_URL}/api/sub-events/${id}`, {
           method: 'PUT',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify(payload)
         });

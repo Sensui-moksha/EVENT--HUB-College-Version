@@ -1,4 +1,5 @@
 // XMLHttpRequest-based uploader to report progress (fetch lacks granular upload progress)
+import { getAuthHeaders } from './api';
 
 export type UploadProgressHandler = (pct: number) => void;
 
@@ -12,6 +13,10 @@ export function uploadFormDataWithProgress(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open(method, url, true);
+    
+    // Set auth header for proxy-friendly fallback
+    const authHeaders = getAuthHeaders();
+    Object.entries(authHeaders).forEach(([k, v]) => xhr.setRequestHeader(k, v));
     
     // Set timeout for large file uploads
     xhr.timeout = timeoutMs;

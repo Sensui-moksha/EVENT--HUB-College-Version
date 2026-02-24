@@ -25,12 +25,7 @@ export default function SubEventsList({ eventId, canCreateSubEvent = false }: Su
   const fetchSubEvents = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/sub-events`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/sub-events`);
 
       if (response.ok) {
         const data = await response.json();

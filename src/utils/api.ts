@@ -25,6 +25,24 @@ import { cacheManager, CACHE_TTL, invalidateCache } from './cacheManager';
 const pendingRequests = new Map<string, Promise<any>>();
 
 /**
+ * Get authentication headers from localStorage user.
+ * Returns { 'x-user-id': id } when a user is stored, empty object otherwise.
+ * This is the fallback auth mechanism when session cookies are lost
+ * behind reverse proxies / CDNs (Cloudflare, Coolify, etc.).
+ */
+export const getAuthHeaders = (): Record<string, string> => {
+  try {
+    const stored = localStorage.getItem('user');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      const id = parsed?._id || parsed?.id;
+      if (id) return { 'x-user-id': id };
+    }
+  } catch (_) { /* ignore parse errors */ }
+  return {};
+};
+
+/**
  * Get the API base URL dynamically based on current access method
  * This allows the same build to work on localhost AND LAN without changes
  * 
@@ -124,9 +142,11 @@ export const apiRequest = async (
     // Build full URL if relative path is provided
     const url = endpoint.startsWith('http') ? endpoint : getApiUrl(endpoint);
 
-    // Default headers
+    // Default headers — include x-user-id for proxy-friendly auth fallback
+    // Skip Content-Type for FormData so the browser sets the multipart boundary
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
+      ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+      ...getAuthHeaders(),
       ...options.headers,
     };
 

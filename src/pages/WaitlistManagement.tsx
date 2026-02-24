@@ -71,12 +71,7 @@ const WaitlistManagement: React.FC = () => {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/events/${eventId}/waitlist`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await fetch(`/api/events/${eventId}/waitlist`);
 
       if (response.ok) {
         const data = await response.json();
@@ -98,12 +93,8 @@ const WaitlistManagement: React.FC = () => {
     if (!window.confirm(`Approve ${userName} from waitlist? This will add them to the event even if at capacity.`)) return;
 
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/events/${eventId}/waitlist/${waitlistUserId}/approve`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        method: 'POST'
       });
 
       const data = await response.json();
@@ -137,12 +128,8 @@ const WaitlistManagement: React.FC = () => {
     if (!window.confirm(`Remove ${userName} from waitlist?`)) return;
 
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/events/${eventId}/waitlist/${waitlistUserId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        method: 'DELETE'
       });
 
       if (response.ok) {

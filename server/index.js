@@ -427,22 +427,49 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 // ============================================================
 
 /**
- * Middleware: Require authentication via session.
- * Rejects with 401 if no valid session exists.
- * Sets req.sessionUser = { _id, email, role, name } from the session.
+ * Middleware: Require authentication via session OR x-user-id header.
+ * 1. Checks session first (preferred when cookies work).
+ * 2. Falls back to x-user-id header (for reverse-proxy / CDN setups where
+ *    session cookies get lost). The header value is validated against the DB.
+ * Rejects with 401 if neither method succeeds.
+ * Sets req.sessionUser = { _id, email, role, name }.
  */
-function requireAuth(req, res, next) {
-  if (!req.session || !req.session.user) {
-    return res.status(401).json({ error: 'Authentication required. Please log in.' });
+async function requireAuth(req, res, next) {
+  // 1. Try session-based auth first
+  if (req.session && req.session.user) {
+    req.sessionUser = {
+      _id: req.session.user._id || req.session.user.id,
+      email: req.session.user.email,
+      role: req.session.user.role,
+      name: req.session.user.name,
+    };
+    return next();
   }
-  // Canonical source of truth — never trust client-supplied userId for identity
-  req.sessionUser = {
-    _id: req.session.user._id || req.session.user.id,
-    email: req.session.user.email,
-    role: req.session.user.role,
-    name: req.session.user.name,
-  };
-  next();
+
+  // 2. Fallback: x-user-id header (validated against DB)
+  const headerUserId = req.headers['x-user-id'];
+  if (headerUserId) {
+    try {
+      const headerUser = await User.findById(headerUserId).select('-password').lean();
+      if (headerUser) {
+        req.sessionUser = {
+          _id: headerUser._id.toString(),
+          email: headerUser.email,
+          role: headerUser.role,
+          name: headerUser.name,
+        };
+        // Restore session so downstream code that reads req.session.user works
+        if (req.session) {
+          req.session.user = req.sessionUser;
+        }
+        return next();
+      }
+    } catch (err) {
+      logger.production('[requireAuth] x-user-id lookup failed:', err && err.message);
+    }
+  }
+
+  return res.status(401).json({ error: 'Authentication required. Please log in.' });
 }
 
 /**

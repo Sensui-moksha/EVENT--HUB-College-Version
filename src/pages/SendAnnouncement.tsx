@@ -56,12 +56,7 @@ const SendAnnouncement: React.FC = () => {
     const fetchUsers = async () => {
       setLoadingUsers(true);
       try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/users', {
-          headers: {
-            'Authorization': token ? `Bearer ${token}` : ''
-          }
-        });
+        const response = await fetch('/api/users');
         if (response.ok) {
           const data = await response.json();
           // Handle both array and object with users property

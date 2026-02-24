@@ -109,12 +109,7 @@ const EventAnalytics: React.FC = () => {
 
   const fetchEvents = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/events', {
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : ''
-        }
-      });
+      const response = await fetch('/api/events');
 
       if (response.ok) {
         const data = await response.json();
@@ -138,12 +133,10 @@ const EventAnalytics: React.FC = () => {
         ? '/api/analytics/events'
         : `/api/analytics/events/${selectedEvent}`;
 
-      const token = localStorage.getItem('token');
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : ''
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ userId }),
       });

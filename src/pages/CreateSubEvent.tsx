@@ -99,12 +99,7 @@ const CreateSubEvent: React.FC = () => {
   useEffect(() => {
     const fetchParentEvent = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${API_BASE_URL}/api/events/${eventId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const response = await fetch(`${API_BASE_URL}/api/events/${eventId}`);
 
         if (response.ok) {
           const event = await response.json();
@@ -343,8 +338,6 @@ const CreateSubEvent: React.FC = () => {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-
       // Determine image dimensions
       const imageDimensions = localImageFile && !localImageDeleted 
         ? { imageWidth: localImageMeta.width, imageHeight: localImageMeta.height }
@@ -429,8 +422,7 @@ const CreateSubEvent: React.FC = () => {
         const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/sub-events`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify(payload)
         });

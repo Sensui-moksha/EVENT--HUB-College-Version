@@ -53,7 +53,6 @@ const PrivacySettings: React.FC = () => {
     // Save to backend
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const updatedSettings = {
         ...privacySettings,
         [setting]: newValue
@@ -62,8 +61,7 @@ const PrivacySettings: React.FC = () => {
       const response = await fetch(`${API_BASE_URL}/api/user/${user._id || user.id}/privacy`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ privacySettings: updatedSettings })
       });

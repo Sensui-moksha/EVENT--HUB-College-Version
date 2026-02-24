@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
+import { getAuthHeaders } from '../utils/api';
 
 interface AuthContextType {
   user: User | null;
@@ -47,7 +48,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const refreshUserData = async () => {
     if (!user || !user._id) return;
     try {
-      const res = await fetch(`/api/users/${user._id}`, { credentials: 'include' });
+      const res = await fetch(`/api/users/${user._id}`, { headers: { ...getAuthHeaders() }, credentials: 'include' });
       const data = await parseResponse(res);
       
       // Check if session is invalid (401/403)
@@ -205,7 +206,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const userId = user._id || user.id;
       const res = await fetch(`/api/user/${userId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(userData)
       });
       const data = await res.json();
@@ -236,7 +237,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // If an avatar already exists, attempt to delete it first so GridFS doesn't keep orphaned files
       try {
         if ((user as any).avatar) {
-          await fetch(`/api/user/${userId}/avatar`, { method: 'DELETE' });
+          await fetch(`/api/user/${userId}/avatar`, { method: 'DELETE', headers: { ...getAuthHeaders() } });
         }
       } catch (delErr) {
         // don't block upload if delete fails; log for debugging
@@ -248,6 +249,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const res = await fetch(`/api/user/${userId}/avatar`, {
         method: 'POST',
+        headers: { ...getAuthHeaders() },
         body: fd,
       });
 
@@ -289,7 +291,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const userId = user._id || user.id;
       const res = await fetch(`/api/user/${userId}/password`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ currentPassword, newPassword })
       });
       const data = await res.json();
@@ -311,6 +313,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Call server logout endpoint to destroy session
     fetch('/api/logout', {
       method: 'POST',
+      headers: { ...getAuthHeaders() },
       credentials: 'include'
     }).catch(err => console.error('Logout error:', err));
     
@@ -323,7 +326,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
   const res = await fetch(`/api/users/${userId}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       });
       if (res.ok) {
         // Optionally, remove user from local state if needed

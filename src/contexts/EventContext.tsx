@@ -3,7 +3,7 @@ import { Event, Registration, EventResult, MultiEventRegistration, QRValidationR
 import { useAuth } from './AuthContext';
 import { useConnection } from './ConnectionContext';
 import { cacheManager, cacheKeys, CACHE_TTL, invalidateCache } from '../utils/cacheManager';
-import { API_BASE_URL } from '../utils/api';
+import { API_BASE_URL, getAuthHeaders } from '../utils/api';
 
 interface EventContextType {
   events: Event[];
@@ -243,7 +243,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
   // Actual server fetch for registrations
   const fetchRegistrationsFromServer = async () => {
     try {
-      const res = await fetch('/api/registrations', { credentials: 'include' });
+      const res = await fetch('/api/registrations', { headers: { ...getAuthHeaders() }, credentials: 'include' });
       const data = await parseResponse(res);
       if (!res.ok) {
         console.error('Failed to fetch registrations: HTTP', res.status, data);
@@ -352,7 +352,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
 
       const res = await fetch(`/api/events/${backendEventId}/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ userId: user._id })
       });
       const data = await parseResponse(res);
@@ -408,7 +408,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
 
       const res = await fetch('/api/events/register-multiple', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ 
           userId: user._id,
           eventIds: backendEventIds
@@ -462,7 +462,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
     try {
       const res = await fetch('/api/qr/validate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ 
           qrData, 
           eventId, 
@@ -506,7 +506,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
 
       const res = await fetch(`/api/events/${backendEventId}/unregister`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ userId: user._id })
       });
       const data = await parseResponse(res);
@@ -547,7 +547,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
 
       const res = await fetch(`/api/events/${backendEventId}/remove-participant`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ 
           userId: userId,
           removedBy: user._id 
@@ -578,7 +578,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
     try {
       const res = await fetch('/api/events', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ ...eventData, organizerId: user._id })
       });
       const data = await parseResponse(res);
@@ -606,7 +606,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
     try {
       const res = await fetch(`/api/events/${eventId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(eventData)
       });
       const data = await parseResponse(res);
@@ -638,7 +638,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
       const backendEventId = (event && (event as any)._id) ? (event as any)._id : eventId;
       const res = await fetch(`/api/events/${backendEventId}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ userId: user?._id || user?.id }),
         credentials: 'include'
       });
@@ -686,7 +686,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
     try {
       const res = await fetch(`/api/events/${eventId}/results`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ results: resultData })
       });
       const data = await parseResponse(res);
