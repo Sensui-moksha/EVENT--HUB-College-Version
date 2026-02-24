@@ -49,9 +49,9 @@ const Home: React.FC = () => {
   // Get active event IDs (upcoming events)
   const activeEventIds = events.filter(e => e.status === 'upcoming').map(e => e.id);
   
-  // Count registrations only for active events
+  // Count registrations only for active events (only approved/registered, not pending)
   // Use registrations array when available, fall back to summing event.currentParticipants
-  const activeRegistrationsFromRegs = registrations.filter(r => activeEventIds.includes(r.eventId)).length;
+  const activeRegistrationsFromRegs = registrations.filter(r => activeEventIds.includes(r.eventId) && (r.approvalStatus === 'approved' || r.status === 'registered')).length;
   const activeRegistrationsFromEvents = events
     .filter(e => e.status === 'upcoming')
     .reduce((sum, e) => sum + (e.currentParticipants || 0), 0);

@@ -1557,8 +1557,12 @@ const CreateEvent: React.FC = () => {
                       </div>
                       <p className="text-sm text-gray-600">
                         {silentRelease
-                          ? 'No notifications or emails will be sent when this event is created.'
-                          : 'Users will receive notifications and emails about this new event.'}
+                          ? isEditMode
+                            ? 'No notifications or emails will be sent when this event is updated.'
+                            : 'No notifications or emails will be sent when this event is created.'
+                          : isEditMode
+                            ? 'Users will receive notifications and emails about changes to this event.'
+                            : 'Users will receive notifications and emails about this new event.'}
                       </p>
                     </div>
                     <div className="ml-4">
@@ -1584,8 +1588,12 @@ const CreateEvent: React.FC = () => {
                       <strong>{silentRelease ? '🔇 Silent Mode' : '🔔 Notifications Enabled'}</strong>
                       <br />
                       {silentRelease 
-                        ? "This event will be created silently without sending any notifications or emails to users."
-                        : "Users will be notified via app notifications and emails when this event is created."}
+                        ? isEditMode
+                          ? "Changes to this event will be saved silently without sending any notifications or emails to users."
+                          : "This event will be created silently without sending any notifications or emails to users."
+                        : isEditMode
+                          ? "Users will be notified via app notifications and emails when content changes (title, date, time, venue, etc.) are made to this event."
+                          : "Users will be notified via app notifications and emails when this event is created."}
                     </p>
                   </div>
                 </div>

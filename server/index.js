@@ -6140,8 +6140,13 @@ app.put('/api/events/:id', requireAuth, async (req, res) => {
     
     // --- NOTIFICATION (background) ---
     // Skip notifications for completed/cancelled events (editing after completion should be silent)
+    // Also skip if silentRelease is enabled - organizer chose to suppress all notifications
     const isCompletedOrCancelled = oldEvent && (oldEvent.status === 'completed' || oldEvent.status === 'cancelled');
-    if (oldEvent && event && !isCompletedOrCancelled) {
+    const isSilentRelease = event && (event.silentRelease === true || event.silentRelease === 'true');
+    if (isSilentRelease) {
+      console.log(`🔇 Silent release enabled for event "${event.title}" - No update notifications sent`);
+    }
+    if (oldEvent && event && !isCompletedOrCancelled && !isSilentRelease) {
       (async () => {
         try {
           const registrations = await Registration.find({ eventId: req.params.id })
@@ -6180,16 +6185,44 @@ app.put('/api/events/:id', requireAuth, async (req, res) => {
             priority = 'urgent';
             notificationType = 'venue_changed';
           }
+          if (oldEvent.category !== event.category) {
+            changes.push(`Category changed to "${event.category}"`);
+          }
+          if (oldEvent.endTime !== event.endTime) {
+            if (event.endTime) {
+              changes.push(`End time updated to ${event.endTime}`);
+            } else {
+              changes.push(`End time removed`);
+            }
+          }
           if (oldEvent.description !== event.description) {
             changes.push(`Description updated`);
           }
           if (oldEvent.maxParticipants !== event.maxParticipants) {
             changes.push(`Max participants updated to ${event.maxParticipants}`);
           }
+          if (oldEvent.registrationDeadline?.toString() !== event.registrationDeadline?.toString()) {
+            changes.push(`Registration deadline updated to ${new Date(event.registrationDeadline).toLocaleDateString()}`);
+          }
+          if (oldEvent.image !== event.image) {
+            changes.push(`Event image updated`);
+          }
+          if (JSON.stringify(oldEvent.requirements || []) !== JSON.stringify(event.requirements || [])) {
+            changes.push(`Requirements updated`);
+          }
+          if (JSON.stringify(oldEvent.prizes || []) !== JSON.stringify(event.prizes || [])) {
+            changes.push(`Prizes updated`);
+          }
           
-          const changeMessage = changes.length > 0 
-            ? `📝 Event "${event.title}" has been updated!\n\n✨ Changes: ${changes.join(', ')}.`
-            : `📝 Event "${event.title}" has been updated with new information.`;
+          // Skip notifications if only settings were changed (no actual event content changes)
+          // Settings-only changes (accessControl, autoApproval, allowOtherColleges, notifyAllUsers,
+          // visibleToOthers, silentRelease, teamSettings, etc.) should NOT trigger user notifications
+          if (changes.length === 0) {
+            console.log(`ℹ️ Settings-only update for event "${event.title}" - No notifications sent (accessControl, autoApproval, college settings, etc.)`);
+            return;
+          }
+          
+          const changeMessage = `📝 Event "${event.title}" has been updated!\n\n✨ Changes: ${changes.join(', ')}.`;
           
           const totalUsers = registrations.length;
           
@@ -6353,7 +6386,117 @@ app.put('/api/events/:id', requireAuth, async (req, res) => {
           }
 
           await eventDoc.save();
-          console.log(`✅ Background: Auto-approved ${autoApprovedCount} registrations for event ${event._id}`);
+          console.log(`✅ Background: Auto-approved ${autoApprovedCount} pending registrations for event ${event._id}`);
+
+          // Also process capacity waitlist entries (Waitlist model) if there's remaining capacity
+          try {
+            const waitlistEntries = await Waitlist.find({ eventId: req.params.id })
+              .populate('userId', '-password')
+              .sort({ position: 1 });
+
+            let waitlistApprovedCount = 0;
+
+            for (const entry of waitlistEntries) {
+              try {
+                // Re-check capacity for each entry
+                const freshEvent = await Event.findById(event._id);
+                if (freshEvent.currentParticipants >= freshEvent.maxParticipants) {
+                  console.log('Event full during waitlist processing, stopping.');
+                  break;
+                }
+
+                const waitlistUser = entry.userId;
+                if (!waitlistUser) continue;
+
+                // Check if already registered
+                const existingReg = await Registration.findOne({ userId: waitlistUser._id, eventId: req.params.id });
+                if (existingReg) {
+                  // Already registered, just remove from waitlist
+                  await Waitlist.findByIdAndDelete(entry._id);
+                  continue;
+                }
+
+                const registrationId = generateUniqueRegistrationId();
+                const issuedAt = new Date().toISOString();
+
+                const qrPayload = {
+                  registrationId,
+                  userId: waitlistUser._id.toString(),
+                  eventIds: [req.params.id],
+                  timestamp: Date.now(),
+                  name: waitlistUser.name,
+                  email: waitlistUser.email,
+                  college: waitlistUser.college,
+                  department: waitlistUser.department,
+                  section: waitlistUser.section || 'A',
+                  year: waitlistUser.year,
+                  regId: waitlistUser.regId || registrationId.substring(0, 8).toUpperCase(),
+                  registeredAt: issuedAt,
+                  events: [{ title: freshEvent.title, venue: freshEvent.venue, date: new Date(freshEvent.date).toLocaleDateString(), time: freshEvent.time, subEvents: freshEvent.subEvents || [] }]
+                };
+
+                const qrContent = generateQRTextContent(qrPayload);
+                const signature = generateQRSignature({
+                  registration_id: registrationId,
+                  student_id: waitlistUser._id.toString(),
+                  event_id: req.params.id,
+                  issued_at: issuedAt
+                });
+                const qrCodeUrl = await generateQRCodeWithEventName(
+                  qrContent, freshEvent.title,
+                  { size: 400, fontSize: 14, fontFamily: 'Arial', fontWeight: 'bold', maxChars: 40, position: 'below', backgroundColor: '#FFFFFF', textColor: '#000000', qrColor: '#000000' }
+                );
+                qrPayload.signature = signature;
+
+                const newReg = new Registration({
+                  registrationId,
+                  userId: waitlistUser._id,
+                  eventId: req.params.id,
+                  status: 'registered',
+                  approvalStatus: 'approved',
+                  approvedAt: new Date(),
+                  approvedBy: freshEvent.organizerId || 'system',
+                  approvalType: 'waitingListApproval',
+                  fromWaitlist: true,
+                  qrCode: qrCodeUrl,
+                  qrPayload: qrPayload,
+                  registeredAt: entry.createdAt
+                });
+
+                await newReg.save();
+                freshEvent.currentParticipants += 1;
+                await freshEvent.save();
+
+                // Remove from waitlist
+                await Waitlist.findByIdAndDelete(entry._id);
+
+                // Notify user
+                notifyUser(
+                  { app: req.app, get: () => null },
+                  waitlistUser._id,
+                  'registration_approved',
+                  `You've been approved from the waitlist for '${freshEvent.title}'! You are now registered.`,
+                  { eventId: freshEvent._id, eventTitle: freshEvent.title, eventImage: freshEvent.image, registrationId: newReg._id }
+                ).catch(() => {});
+
+                waitlistApprovedCount += 1;
+              } catch (wlErr) {
+                console.error('Error processing waitlist entry', entry._id, wlErr);
+              }
+            }
+
+            // Recalculate remaining waitlist positions
+            if (waitlistApprovedCount > 0) {
+              const remainingEntries = await Waitlist.find({ eventId: req.params.id }).sort({ position: 1 });
+              for (let i = 0; i < remainingEntries.length; i++) {
+                remainingEntries[i].position = i + 1;
+                await remainingEntries[i].save();
+              }
+              console.log(`✅ Background: Auto-approved ${waitlistApprovedCount} waitlist entries for event ${event._id}`);
+            }
+          } catch (wlError) {
+            console.error('Background waitlist processing error:', wlError);
+          }
         } catch (autoErr) {
           console.error('Background auto-approval error:', autoErr);
         }

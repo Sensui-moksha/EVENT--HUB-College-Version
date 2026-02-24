@@ -3578,13 +3578,15 @@ const EventDetails: React.FC = () => {
                     <h3 className="text-lg sm:text-xl font-bold text-gray-900">Approval Waiting List</h3>
                     <p className="text-xs sm:text-sm text-gray-600 line-clamp-2">
                       {event.autoApproval 
-                        ? "Auto-approval is ON - All registrations are approved instantly"
+                        ? pendingCount > 0
+                          ? `Auto-approval is ON - ${pendingCount} late/post-deadline registration(s) pending approval`
+                          : "Auto-approval is ON - All registrations are approved instantly"
                         : "Manual approval required - Review and approve pending registrations"
                       }
                     </p>
                   </div>
                 </div>
-                {!event.autoApproval && (
+                {(!event.autoApproval || pendingCount > 0) && (
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     {pendingCount > 0 && (
                       <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-yellow-500 text-white rounded-full font-semibold text-xs sm:text-sm">
@@ -3650,13 +3652,15 @@ const EventDetails: React.FC = () => {
                 </div>
                 <p className="text-xs sm:text-sm mt-2 text-gray-700">
                   {event.autoApproval
-                    ? "All new registrations are automatically approved with instant QR code access."
+                    ? pendingCount > 0
+                      ? `Registrations before the deadline are auto-approved. ${pendingCount} post-deadline registration(s) require manual approval.`
+                      : "All new registrations are automatically approved with instant QR code access."
                     : "New registrations require manual approval before users can access their QR codes."}
                 </p>
               </div>
 
               {/* Waiting List Manager */}
-              {!event.autoApproval && showApprovalWaitlist && (
+              {(!event.autoApproval || pendingCount > 0) && showApprovalWaitlist && (
                 <WaitingListManager 
                   eventId={id!} 
                   readOnly={!isPrivileged}
@@ -3700,7 +3704,7 @@ const EventDetails: React.FC = () => {
                 />
               )}
 
-              {!event.autoApproval && !showApprovalWaitlist && (
+              {(!event.autoApproval || pendingCount > 0) && !showApprovalWaitlist && (
                 <div className="text-center py-6 sm:py-8 text-gray-500">
                   <Clock className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 sm:mb-3 text-gray-400" />
                   <p className="text-sm sm:text-base">
@@ -3711,7 +3715,7 @@ const EventDetails: React.FC = () => {
                 </div>
               )}
 
-              {event.autoApproval && (
+              {event.autoApproval && pendingCount === 0 && (
                 <div className="text-center py-6 sm:py-8 text-gray-500">
                   <CheckCircle className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 sm:mb-3 text-green-400" />
                   <p className="text-gray-600 text-sm sm:text-base">
