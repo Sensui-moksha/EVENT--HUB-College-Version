@@ -257,6 +257,7 @@ const WaitingListManager: React.FC<WaitingListManagerProps> = ({ eventId, onUpda
 
                 <div className="flex gap-2 w-full sm:w-auto sm:ml-4">
                   {!readOnly && (
+                  <>
                   <button
                     onClick={() => handleApprove(regId)}
                     disabled={isProcessing}
@@ -277,6 +278,7 @@ const WaitingListManager: React.FC<WaitingListManagerProps> = ({ eventId, onUpda
                     <span className="hidden sm:inline">Reject</span>
                     <span className="sm:hidden">✗</span>
                   </button>
+                  </>
                   )}
                 </div>
               </div>
