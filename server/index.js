@@ -7502,16 +7502,27 @@ app.post('/api/analytics/events', requireAuth, async (req, res) => {
       eventRegistrationCount[eventId] = (eventRegistrationCount[eventId] || 0) + 1;
     });
     
+    // Fetch organizer details for all events
+    const organizerIds = [...new Set(events.map(e => e.organizerId).filter(Boolean))];
+    const organizers = await User.find({ _id: { $in: organizerIds } }).select('name department').lean();
+    const organizerMap = {};
+    organizers.forEach(o => { organizerMap[o._id.toString()] = { name: o.name, department: o.department }; });
+
     const topEvents = events
-      .map(event => ({
-        _id: event._id,
-        title: event.title,
-        image: event.image,
-        registrations: eventRegistrationCount[event._id.toString()] || 0,
-        capacity: event.maxParticipants,
-        date: event.date,
-        status: event.status
-      }))
+      .map(event => {
+        const organizer = organizerMap[event.organizerId?.toString()] || {};
+        return {
+          _id: event._id,
+          title: event.title,
+          image: event.image,
+          registrations: eventRegistrationCount[event._id.toString()] || 0,
+          capacity: event.maxParticipants,
+          date: event.date,
+          status: event.status,
+          createdBy: organizer.name || 'Unknown',
+          department: organizer.department || 'N/A'
+        };
+      })
       .sort((a, b) => b.registrations - a.registrations)
       .slice(0, 10);
     
@@ -7554,6 +7565,9 @@ app.post('/api/analytics/events/:eventId', requireAuth, async (req, res) => {
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
     }
+
+    // Fetch organizer info for this event
+    const organizerInfo = event.organizerId ? await User.findById(event.organizerId).select('name department').lean() : null;
     
     // Check authorization from session
     if (req.sessionUser.role !== 'admin' && event.organizerId.toString() !== userId.toString()) {
@@ -7595,7 +7609,9 @@ app.post('/api/analytics/events/:eventId', requireAuth, async (req, res) => {
         registrations: totalRegistrations,
         capacity: event.maxParticipants,
         date: event.date,
-        status: event.status
+        status: event.status,
+        createdBy: (() => { const o = organizerInfo; return o ? o.name : 'Unknown'; })(),
+        department: (() => { const o = organizerInfo; return o ? o.department : 'N/A'; })()
       }],
       recentRegistrations
     });

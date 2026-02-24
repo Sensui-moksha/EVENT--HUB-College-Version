@@ -84,6 +84,8 @@ interface EventAnalytics {
     capacity: number;
     date: string;
     status: string;
+    createdBy: string;
+    department: string;
   }>;
   recentRegistrations: Array<{
     eventTitle: string;
@@ -778,6 +780,8 @@ const EventAnalytics: React.FC = () => {
                       <thead>
                         <tr className="border-b border-gray-100">
                           <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Event</th>
+                          <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Created By</th>
+                          <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Department</th>
                           <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Registrations</th>
                           <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Capacity</th>
                           <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fill Rate</th>
@@ -803,6 +807,12 @@ const EventAnalytics: React.FC = () => {
                                   </div>
                                   <span className="font-medium text-gray-900 truncate max-w-[200px]">{event.title}</span>
                                 </div>
+                              </td>
+                              <td className="py-4 px-4">
+                                <span className="text-sm font-medium text-gray-700 truncate max-w-[150px] block">{event.createdBy || 'Unknown'}</span>
+                              </td>
+                              <td className="py-4 px-4">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 truncate max-w-[150px]">{event.department || 'N/A'}</span>
                               </td>
                               <td className="py-4 px-4 text-center">
                                 <span className="font-semibold text-gray-900">{event.registrations}</span>
