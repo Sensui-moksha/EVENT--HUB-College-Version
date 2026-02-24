@@ -11,9 +11,10 @@ interface WaitingListManagerProps {
   eventTitle?: string;
   onUpdate?: () => void;
   renderRegistrationExtra?: (reg: any) => React.ReactNode;
+  readOnly?: boolean;
 }
 
-const WaitingListManager: React.FC<WaitingListManagerProps> = ({ eventId, onUpdate, renderRegistrationExtra }) => {
+const WaitingListManager: React.FC<WaitingListManagerProps> = ({ eventId, onUpdate, renderRegistrationExtra, readOnly = false }) => {
   const { user } = useAuth();
   const { addToast } = useToast();
   
@@ -255,6 +256,7 @@ const WaitingListManager: React.FC<WaitingListManagerProps> = ({ eventId, onUpda
                 </div>
 
                 <div className="flex gap-2 w-full sm:w-auto sm:ml-4">
+                  {!readOnly && (
                   <button
                     onClick={() => handleApprove(regId)}
                     disabled={isProcessing}
@@ -275,6 +277,7 @@ const WaitingListManager: React.FC<WaitingListManagerProps> = ({ eventId, onUpda
                     <span className="hidden sm:inline">Reject</span>
                     <span className="sm:hidden">✗</span>
                   </button>
+                  )}
                 </div>
               </div>
             </motion.div>

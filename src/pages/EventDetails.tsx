@@ -190,6 +190,13 @@ const EventDetails: React.FC = () => {
     return userId === event?.organizerId;
   }, [event, user?.role, userId]);
 
+  // canView: any organizer (even if not the event creator) can view participants, details, etc.
+  // but only isPrivileged users (admin + event creator) can edit/delete/remove/accept
+  const canView = useMemo(() => {
+    if (isPrivileged) return true;
+    return user?.role === 'organizer';
+  }, [isPrivileged, user?.role]);
+
   // Fetch team invitations for this user and event
   const fetchTeamInvitations = useCallback(async () => {
     if (!userId || !id) return;
@@ -311,12 +318,12 @@ const EventDetails: React.FC = () => {
   useEffect(() => {
     if (id && userId) {
       checkWaitlistStatus();
-      // Fetch waitlist users for admin/event owner
-      if (isPrivileged) {
+      // Fetch waitlist users for admin/event owner/any organizer
+      if (canView) {
         fetchWaitlistUsers();
       }
     }
-  }, [id, userId, isPrivileged, checkWaitlistStatus, fetchWaitlistUsers]);
+  }, [id, userId, canView, checkWaitlistStatus, fetchWaitlistUsers]);
 
   // Fetch team invitations for this event
   useEffect(() => {
@@ -332,10 +339,11 @@ const EventDetails: React.FC = () => {
     const event = events.find(e => e.id === id || e._id === id);
     if (!event) return;
     
-    const isOrganizer = event.organizerId === userId;
+    const isEventCreator = event.organizerId === userId;
     const isAdmin = userRole === 'admin';
+    const isAnyOrganizer = userRole === 'organizer';
     
-    if (!isOrganizer && !isAdmin) return;
+    if (!isEventCreator && !isAdmin && !isAnyOrganizer) return;
     
     try {
       const response = await fetch(
@@ -1152,13 +1160,13 @@ const EventDetails: React.FC = () => {
       if (event.status === 'completed') {
         fetchWinners();
       }
-      if (isPrivileged && event.status === 'completed') {
+      if (canView && event.status === 'completed') {
         fetchSpotRegistrations();
         fetchEligibleWinners();
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event?.status, isPrivileged]);
+  }, [event?.status, canView]);
 
   if (!event) {
     return (
@@ -1899,6 +1907,7 @@ const EventDetails: React.FC = () => {
                       <p className="text-xs text-gray-500 mt-2">
                         This event has ended • Event date: {format(new Date(event.date), 'MMM dd, yyyy')}
                         {isPrivileged && ' • Click "Mark as Completed" to finalize'}
+                        {canView && !isPrivileged && ' • Event ended'}
                       </p>
                     </>
                   ) : (
@@ -1994,7 +2003,7 @@ const EventDetails: React.FC = () => {
                 <Images className="w-5 h-5" />
                 <span>View Gallery</span>
               </Link>
-              {isPrivileged && (
+              {canView && (
                 <Link
                   to={`/dashboard/gallery/${id}`}
                   className="flex-1 px-4 sm:px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-medium flex items-center justify-center space-x-2 text-sm sm:text-base shadow-lg"
@@ -3340,11 +3349,11 @@ const EventDetails: React.FC = () => {
             <div className="overflow-x-auto min-h-[400px]">
               <table className="min-w-full bg-white border border-gray-200 rounded-lg table-fixed">
                 <colgroup>
-                  {isPrivileged && (
+                  {canView && (
                     <col className="w-24" />
                   )}
                   <col className="w-36" />
-                  {isPrivileged && (
+                  {canView && (
                     <col className="w-56" />
                   )}
                   <col className="w-20" />
@@ -3362,11 +3371,11 @@ const EventDetails: React.FC = () => {
                 </colgroup>
                 <thead>
                   <tr>
-                    {isPrivileged && (
+                    {canView && (
                       <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Reg. ID</th>
                     )}
                     <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Name</th>
-                    {isPrivileged && (
+                    {canView && (
                       <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Email</th>
                     )}
                     <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Dept</th>
@@ -3392,7 +3401,7 @@ const EventDetails: React.FC = () => {
                       animate={{ opacity: 1 }}
                       transition={{ duration: 0.6, ease: "easeOut" }}
                     >
-                      {isPrivileged && (
+                      {canView && (
                         <td className="px-2 py-3 text-xs text-gray-800">{reg.user?.regId ?? reg.id}</td>
                       )}
                       <td className="px-2 py-3 text-xs">
@@ -3407,7 +3416,7 @@ const EventDetails: React.FC = () => {
                           <span className="text-gray-800">{reg.user?.name ?? '-'}</span>
                         )}
                       </td>
-                      {isPrivileged && (
+                      {canView && (
                         <td className="px-2 py-3 text-xs text-gray-800 break-words">{reg.user?.email ?? '-'}</td>
                       )}
                       <td className="px-2 py-3 text-xs text-gray-800">{reg.user?.department ?? '-'}</td>
@@ -3551,8 +3560,8 @@ const EventDetails: React.FC = () => {
         </div>
         )}
 
-        {/* Approval Waiting List Section - Only for event owner/admins */}
-        {isPrivileged && (
+        {/* Approval Waiting List Section - Visible to all organizers/admins */}
+        {canView && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -3582,22 +3591,40 @@ const EventDetails: React.FC = () => {
                         {pendingCount} Pending
                       </span>
                     )}
-                    <button
-                      onClick={() => {
-                        setShowApprovalWaitlist(!showApprovalWaitlist);
-                        // Refresh pending count when opening
-                        if (!showApprovalWaitlist) {
-                          fetchPendingCount();
-                        }
-                      }}
-                      className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-colors text-xs sm:text-sm ${
-                        showApprovalWaitlist
-                          ? 'bg-gray-200 text-gray-700'
-                          : 'bg-blue-500 text-white hover:bg-blue-600'
-                      }`}
-                    >
-                      {showApprovalWaitlist ? 'Hide' : 'Manage'}
-                    </button>
+                    {isPrivileged ? (
+                      <button
+                        onClick={() => {
+                          setShowApprovalWaitlist(!showApprovalWaitlist);
+                          // Refresh pending count when opening
+                          if (!showApprovalWaitlist) {
+                            fetchPendingCount();
+                          }
+                        }}
+                        className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-colors text-xs sm:text-sm ${
+                          showApprovalWaitlist
+                            ? 'bg-gray-200 text-gray-700'
+                            : 'bg-blue-500 text-white hover:bg-blue-600'
+                        }`}
+                      >
+                        {showApprovalWaitlist ? 'Hide' : 'Manage'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setShowApprovalWaitlist(!showApprovalWaitlist);
+                          if (!showApprovalWaitlist) {
+                            fetchPendingCount();
+                          }
+                        }}
+                        className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-colors text-xs sm:text-sm ${
+                          showApprovalWaitlist
+                            ? 'bg-gray-200 text-gray-700'
+                            : 'bg-gray-500 text-white hover:bg-gray-600'
+                        }`}
+                      >
+                        {showApprovalWaitlist ? 'Hide' : 'View'}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -3632,6 +3659,7 @@ const EventDetails: React.FC = () => {
               {!event.autoApproval && showApprovalWaitlist && (
                 <WaitingListManager 
                   eventId={id!} 
+                  readOnly={!isPrivileged}
                   onUpdate={() => {
                     fetchPendingCount();
                   }}

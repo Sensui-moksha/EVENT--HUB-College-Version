@@ -3192,12 +3192,13 @@ app.get('/api/events/:eventId/registrations/pending', requireAuth, async (req, r
       return res.status(404).json({ error: 'Event not found' });
     }
 
-    // Check if user is organizer or admin (from session)
-    const isOrganizer = event.organizerId.toString() === userId.toString();
+    // Check if user is organizer (creator), any organizer role, or admin
+    const isEventCreator = event.organizerId.toString() === userId.toString();
     const isAdmin = req.sessionUser.role === 'admin';
+    const isAnyOrganizer = req.sessionUser.role === 'organizer';
 
-    if (!isOrganizer && !isAdmin) {
-      return res.status(403).json({ error: 'Only event organizers and admins can view pending registrations' });
+    if (!isEventCreator && !isAdmin && !isAnyOrganizer) {
+      return res.status(403).json({ error: 'Only organizers and admins can view pending registrations' });
     }
 
     // Get all pending registrations
