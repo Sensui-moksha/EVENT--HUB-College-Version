@@ -3665,10 +3665,12 @@ app.get('/api/scan-logs', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-// Get all registrations
-app.get('/api/registrations', requireAuth, requireAdmin, async (req, res) => {
+// Get registrations — admins see all, regular users see only their own
+app.get('/api/registrations', requireAuth, async (req, res) => {
   try {
-    const registrations = await Registration.find()
+    const isAdmin = req.sessionUser.role === 'admin';
+    const query = isAdmin ? {} : { userId: req.sessionUser._id };
+    const registrations = await Registration.find(query)
       .populate('userId')
       .populate('eventId', 'autoApproval title');
     

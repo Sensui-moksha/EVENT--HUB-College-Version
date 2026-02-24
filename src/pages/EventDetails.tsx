@@ -180,6 +180,16 @@ const EventDetails: React.FC = () => {
   const userId = user?._id || user?.id;
   const userRole = user?.role;
 
+  // Robust event lookup — declared early so hooks below can reference `event` and `isPrivileged`
+  const event = events.find(e => e.id === id || e._id === id);
+
+  // Compute isPrivileged early so hooks can reference it without TDZ errors
+  const isPrivileged = useMemo(() => {
+    if (!event) return false;
+    if (user?.role === 'admin') return true;
+    return userId === event?.organizerId;
+  }, [event, user?.role, userId]);
+
   // Fetch team invitations for this user and event
   const fetchTeamInvitations = useCallback(async () => {
     if (!userId || !id) return;
@@ -817,8 +827,7 @@ const EventDetails: React.FC = () => {
 
   // ...existing code...
 
-  // Robust event lookup for both id and _id
-  const event = events.find(e => e.id === id || e._id === id);
+  // event is already declared earlier (near userId/userRole) to avoid TDZ issues
   
   // Ensure registrations is an array before using array methods
   const safeRegistrations = Array.isArray(registrations) ? registrations : [];
@@ -1145,14 +1154,7 @@ const EventDetails: React.FC = () => {
     return reasons;
   }, [event, user]);
 
-  // Compute isPrivileged early (before early returns) so hooks can use it
-  // Only the event creator (organizer) or admin can manage (edit/delete) the event
-  const isPrivileged = useMemo(() => {
-    if (!event) return false;
-    if (user?.role === 'admin') return true;
-    // For organizers, only the event creator is privileged
-    return userId === event?.organizerId;
-  }, [event, user?.role, userId]);
+  // isPrivileged is already declared earlier (near event) to avoid TDZ issues
 
   // Fetch winners/spot registrations for completed events - must be before early returns
   useEffect(() => {

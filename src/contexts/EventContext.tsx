@@ -243,7 +243,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
   // Actual server fetch for registrations
   const fetchRegistrationsFromServer = async () => {
     try {
-      const res = await fetch('/api/registrations');
+      const res = await fetch('/api/registrations', { credentials: 'include' });
       const data = await parseResponse(res);
       if (!res.ok) {
         console.error('Failed to fetch registrations: HTTP', res.status, data);
