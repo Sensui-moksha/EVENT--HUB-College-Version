@@ -330,6 +330,7 @@ const CreateEvent: React.FC = () => {
       organizerId: user.id ?? user._id ?? '',
       requirements: formData.requirements.filter((req: string) => req.trim() !== ''),
       prizes: formData.prizes.filter((prize: string) => prize.trim() !== ''),
+      status: isAlreadyCompleted ? 'completed' : formData.status,
       accessControl: accessControl,
       autoApproval: autoApproval,
       allowOtherColleges: allowOtherColleges,
@@ -403,11 +404,12 @@ const CreateEvent: React.FC = () => {
           fd.append('collegeName', eventData.collegeName);
           fd.append('isTeamEvent', String(eventData.isTeamEvent));
           fd.append('isAlreadyCompleted', String(eventData.isAlreadyCompleted));
+          fd.append('status', eventData.status);
           fd.append('minTeamSize', String(eventData.minTeamSize));
           fd.append('maxTeamSize', String(eventData.maxTeamSize));
           fd.append('accessControl', JSON.stringify(eventData.accessControl));
-          eventData.requirements.forEach(r => fd.append('requirements', r));
-          eventData.prizes.forEach(p => fd.append('prizes', p));
+          eventData.requirements.forEach((r: string) => fd.append('requirements', r));
+          eventData.prizes.forEach((p: string) => fd.append('prizes', p));
           fd.append('image', localImageFile);
           if (localImageMeta.width) fd.append('imageWidth', String(localImageMeta.width));
           if (localImageMeta.height) fd.append('imageHeight', String(localImageMeta.height));
