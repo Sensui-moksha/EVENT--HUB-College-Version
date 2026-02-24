@@ -18,7 +18,8 @@ import {
   Bell,
   Eye,
   BellOff,
-  Loader2
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
 import { pageVariants } from '../utils/animations';
 import AccessControlForm from '../components/AccessControlForm';
@@ -27,7 +28,6 @@ import TimePicker from '../components/TimePicker';
 import { AccessControl } from '../types/subEvent';
 import { uploadFormDataWithProgress } from '../utils/upload';
 import { API_BASE_URL } from '../utils/api';
-import { DEFAULT_COLLEGE } from '../config/college';
 import { DEFAULT_COLLEGE } from '../config/college';
 
 // Helper function to get full image URL for relative paths
@@ -147,6 +147,9 @@ const CreateEvent: React.FC = () => {
   const [silentRelease, setSilentRelease] = useState<boolean>(
     (editingEvent as any)?.silentRelease ?? false
   );
+
+  // Already Completed: allows creating past/completed events for gallery media uploads
+  const [isAlreadyCompleted, setIsAlreadyCompleted] = useState<boolean>(false);
 
   // Team event settings
   const [isTeamEvent, setIsTeamEvent] = useState<boolean>(
@@ -282,28 +285,31 @@ const CreateEvent: React.FC = () => {
     if (!user) return;
 
     // Validation
-    // Skip date validation in edit mode if date hasn't changed (event might be happening soon)
-    const isDateChanged = isEditMode ? new Date(formData.date).getTime() !== new Date(editingEvent?.date || '').getTime() : true;
-    if (isDateChanged && new Date(formData.date) <= new Date()) {
-      addToast({
-        type: 'error',
-        title: 'Invalid Date',
-        message: 'Event date must be in the future.',
-      });
-      return;
-    }
-    
-    // Validate registration deadline is before event date/time
-    const regDeadlineDateTime = new Date(`${formData.registrationDeadline}T${formData.registrationDeadlineTime || '23:59'}:00`);
-    const eventDateTime = new Date(`${formData.date}T${formData.time}:00`);
-    
-    if (regDeadlineDateTime >= eventDateTime) {
-      addToast({
-        type: 'error',
-        title: 'Invalid Registration Deadline',
-        message: 'Registration deadline must be before the event starts.',
-      });
-      return;
+    // Skip date validations entirely for already-completed events
+    if (!isAlreadyCompleted) {
+      // Skip date validation in edit mode if date hasn't changed (event might be happening soon)
+      const isDateChanged = isEditMode ? new Date(formData.date).getTime() !== new Date(editingEvent?.date || '').getTime() : true;
+      if (isDateChanged && new Date(formData.date) <= new Date()) {
+        addToast({
+          type: 'error',
+          title: 'Invalid Date',
+          message: 'Event date must be in the future.',
+        });
+        return;
+      }
+      
+      // Validate registration deadline is before event date/time
+      const regDeadlineDateTime = new Date(`${formData.registrationDeadline}T${formData.registrationDeadlineTime || '23:59'}:00`);
+      const eventDateTime = new Date(`${formData.date}T${formData.time}:00`);
+      
+      if (regDeadlineDateTime >= eventDateTime) {
+        addToast({
+          type: 'error',
+          title: 'Invalid Registration Deadline',
+          message: 'Registration deadline must be before the event starts.',
+        });
+        return;
+      }
     }
 
     // Determine image dimensions (from local upload or URL)
@@ -318,7 +324,9 @@ const CreateEvent: React.FC = () => {
       // If user selected 'other' and provided a custom category, prefer it
       category: formData.category === 'other' && formData.customCategory ? formData.customCategory : formData.category,
       date: new Date(formData.date),
-      registrationDeadline: new Date(`${formData.registrationDeadline}T${formData.registrationDeadlineTime || '23:59'}:00`),
+      registrationDeadline: isAlreadyCompleted
+        ? new Date(`${formData.date}T${formData.time || '23:59'}:00`)
+        : new Date(`${formData.registrationDeadline}T${formData.registrationDeadlineTime || '23:59'}:00`),
       organizerId: user.id ?? user._id ?? '',
       requirements: formData.requirements.filter((req: string) => req.trim() !== ''),
       prizes: formData.prizes.filter((prize: string) => prize.trim() !== ''),
@@ -327,9 +335,10 @@ const CreateEvent: React.FC = () => {
       allowOtherColleges: allowOtherColleges,
       notifyAllUsers: notifyAllUsers,
       visibleToOthers: visibleToOthers,
-      silentRelease: silentRelease,
+      silentRelease: isAlreadyCompleted ? true : silentRelease,
       collegeName: COLLEGE_NAME,
       isTeamEvent: isTeamEvent,
+      isAlreadyCompleted: isAlreadyCompleted,
       minTeamSize: isTeamEvent ? minTeamSize : 1,
       maxTeamSize: isTeamEvent ? maxTeamSize : 1,
       ...imageDimensions,
@@ -393,6 +402,7 @@ const CreateEvent: React.FC = () => {
           fd.append('silentRelease', String(eventData.silentRelease));
           fd.append('collegeName', eventData.collegeName);
           fd.append('isTeamEvent', String(eventData.isTeamEvent));
+          fd.append('isAlreadyCompleted', String(eventData.isAlreadyCompleted));
           fd.append('minTeamSize', String(eventData.minTeamSize));
           fd.append('maxTeamSize', String(eventData.maxTeamSize));
           fd.append('accessControl', JSON.stringify(eventData.accessControl));
@@ -914,28 +924,52 @@ const CreateEvent: React.FC = () => {
               </div>
 
               {/* Registration Deadline */}
-              <div>
-                <label htmlFor="registrationDeadline" className="block text-sm font-medium text-gray-700 mb-2">
-                  Registration Deadline *
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    id="registrationDeadline"
-                    name="registrationDeadline"
-                    type="date"
-                    required
-                    value={formData.registrationDeadline}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                  <TimePicker
-                    value={formData.registrationDeadlineTime}
-                    onChange={(time) => setFormData(prev => ({ ...prev, registrationDeadlineTime: time }))}
-                    required
-                  />
+              {isAlreadyCompleted ? (
+                <div className="opacity-60">
+                  <label htmlFor="registrationDeadline" className="block text-sm font-medium text-gray-400 mb-2">
+                    Registration Deadline (auto-set for completed events)
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      id="registrationDeadline"
+                      name="registrationDeadline"
+                      type="date"
+                      value={formData.registrationDeadline || formData.date}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                      readOnly
+                    />
+                    <TimePicker
+                      value={formData.registrationDeadlineTime || formData.time || '23:59'}
+                      onChange={() => {}}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Registration deadline is automatically set for completed events</p>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Registration closes at this exact time</p>
-              </div>
+              ) : (
+                <div>
+                  <label htmlFor="registrationDeadline" className="block text-sm font-medium text-gray-700 mb-2">
+                    Registration Deadline *
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      id="registrationDeadline"
+                      name="registrationDeadline"
+                      type="date"
+                      required
+                      value={formData.registrationDeadline}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                    <TimePicker
+                      value={formData.registrationDeadlineTime}
+                      onChange={(time) => setFormData(prev => ({ ...prev, registrationDeadlineTime: time }))}
+                      required
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Registration closes at this exact time</p>
+                </div>
+              )}
             </div>
 
             {/* Right Column */}
@@ -1151,6 +1185,54 @@ const CreateEvent: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Already Completed Checkbox — only for new events */}
+          {!isEditMode && (
+            <div className="mt-8">
+              <div className="border-t border-gray-200 pt-6">
+                <label className="flex items-start gap-3 cursor-pointer select-none group">
+                  <input
+                    type="checkbox"
+                    checked={isAlreadyCompleted}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setIsAlreadyCompleted(checked);
+                      if (checked) {
+                        setSilentRelease(true);
+                        // Auto-fill registration deadline to match event date if not already set
+                        if (formData.date && !formData.registrationDeadline) {
+                          setFormData(prev => ({
+                            ...prev,
+                            registrationDeadline: prev.date,
+                            registrationDeadlineTime: prev.time || '23:59',
+                          }));
+                        }
+                      }
+                    }}
+                    className="mt-1 h-5 w-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 transition"
+                  />
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <CheckCircle2 className="w-5 h-5 text-amber-500" />
+                      <span className="text-lg font-semibold text-gray-900">This event is already completed</span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Enable this to create a past event that has already taken place. Date restrictions will be removed so you can enter the original event date. The event will be marked as <strong>completed</strong> and no notifications will be sent.
+                    </p>
+                  </div>
+                </label>
+                {isAlreadyCompleted && (
+                  <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-sm text-amber-800">
+                      <strong>📋 Completed Event Mode</strong>
+                      <br />
+                      This event will be created with status <strong>"completed"</strong>. You can upload gallery media to it after creation. Past dates are allowed and notifications are silenced.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Access Control Section */}
           <div className="mt-8">

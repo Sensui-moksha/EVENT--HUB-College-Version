@@ -124,17 +124,8 @@ const sendEventRegistrationEmail = async (to, username, eventDetails) => {
     text: template.text,
   });
   
-  // Also notify admin about event registration (respecting rate limits)
-  await notifyAdmin({
-    type: 'event_registration',
-    data: {
-      username,
-      email: to,
-      eventName: eventDetails.eventName,
-      eventId: eventDetails.eventId,
-      registeredAt: new Date().toISOString(),
-    },
-  });
+  // Note: Admin notification removed — only the event creator (organizer) is notified
+  // about registrations for their specific event, handled in server/index.js
   
   return result;
 };

@@ -10,7 +10,6 @@ import {
   Trophy, 
   Zap,
   ArrowRight,
-  Star,
   TrendingUp
 } from 'lucide-react';
 import { pageVariants } from '../utils/animations';
@@ -250,90 +249,7 @@ const Home: React.FC = () => {
         </motion.div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-12 sm:py-16 lg:py-20 bg-white">
-        <motion.div 
-          className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 xl:px-10"
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-        >
-          <div className="text-center mb-8 sm:mb-12">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
-              Why Choose EventHub?
-            </h2>
-            <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-2xl mx-auto px-4 sm:px-0">
-              Experience seamless event management with cutting-edge features.
-            </p>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 lg:gap-10">
-            <div className="text-center p-6 sm:p-8 lg:p-10 rounded-xl bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-100 hover:shadow-lg transition-all duration-300">
-              <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-blue-600 rounded-full mb-4 sm:mb-6">
-                <Zap className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-              </div>
-              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3">
-                Instant Registration
-              </h3>
-              <p className="text-sm sm:text-base text-gray-600">
-                Register for events with just a few clicks. Get instant confirmation and QR codes.
-              </p>
-            </div>
-
-            <div className="text-center p-6 sm:p-8 lg:p-10 rounded-xl bg-gradient-to-br from-green-50 to-blue-50 border border-green-100 hover:shadow-lg transition-all duration-300">
-              <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-green-600 rounded-full mb-4 sm:mb-6">
-                <Star className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-              </div>
-              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3">
-                Smart Notifications
-              </h3>
-              <p className="text-sm sm:text-base text-gray-600">
-                Never miss an event with intelligent reminders and real-time updates.
-              </p>
-            </div>
-
-            <div className="text-center p-6 sm:p-8 lg:p-10 rounded-xl bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-100 hover:shadow-lg transition-all duration-300">
-              <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-purple-600 rounded-full mb-4 sm:mb-6">
-                <Trophy className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-              </div>
-              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3">
-                Track Results
-              </h3>
-              <p className="text-sm sm:text-base text-gray-600">
-                View competition results, winners, and your achievement history.
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      </section>
-
-      {/* CTA Section */}
-      {!user && (
-        <section className="py-12 sm:py-16 lg:py-20 bg-gradient-to-r from-blue-600 to-purple-600">
-          <motion.div 
-            className="max-w-4xl mx-auto text-center px-3 sm:px-4 md:px-6 lg:px-8"
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-3 sm:mb-4">
-              Ready to Get Started?
-            </h2>
-            <p className="text-base sm:text-lg lg:text-xl text-blue-100 mb-6 sm:mb-8 px-4 sm:px-0">
-              Join thousands of students already using EventHub to discover amazing opportunities.
-            </p>
-            <Link
-              to="/register"
-              className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-white text-blue-600 rounded-lg font-semibold hover:bg-gray-50 transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base"
-            >
-              Create Your Account
-              <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-            </Link>
-          </motion.div>
-        </section>
-      )}
     </motion.div>
   );
 };

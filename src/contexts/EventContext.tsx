@@ -531,11 +531,8 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
   const removeParticipant = async (eventId: string, userId: string): Promise<boolean> => {
     if (!user) return false;
     
-    // Check if user has permission (admin or organizer)
-    if (user.role !== 'admin' && user.role !== 'organizer') {
-      console.error('Unauthorized: Only admins and organizers can remove participants');
-      return false;
-    }
+    // Permission is enforced server-side (event owner + admin only)
+    // Client-side: just check user is logged in
 
     setLoading(true);
     try {
@@ -640,7 +637,10 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
       const event = events.find(e => e.id === eventId || (e as any)._id === eventId);
       const backendEventId = (event && (event as any)._id) ? (event as any)._id : eventId;
       const res = await fetch(`/api/events/${backendEventId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user?._id || user?.id }),
+        credentials: 'include'
       });
       
       // If response is ok (200-299), deletion was successful

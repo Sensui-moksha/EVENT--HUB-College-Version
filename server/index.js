@@ -422,6 +422,49 @@ app.use((req, res, next) => {
 // Serve uploaded images statically
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
+// ============================================================
+// Session-based Auth Middleware
+// ============================================================
+
+/**
+ * Middleware: Require authentication via session.
+ * Rejects with 401 if no valid session exists.
+ * Sets req.sessionUser = { _id, email, role, name } from the session.
+ */
+function requireAuth(req, res, next) {
+  if (!req.session || !req.session.user) {
+    return res.status(401).json({ error: 'Authentication required. Please log in.' });
+  }
+  // Canonical source of truth — never trust client-supplied userId for identity
+  req.sessionUser = {
+    _id: req.session.user._id || req.session.user.id,
+    email: req.session.user.email,
+    role: req.session.user.role,
+    name: req.session.user.name,
+  };
+  next();
+}
+
+/**
+ * Middleware: Require admin role (must be used AFTER requireAuth).
+ */
+function requireAdmin(req, res, next) {
+  if (!req.sessionUser || req.sessionUser.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required.' });
+  }
+  next();
+}
+
+/**
+ * Middleware: Require admin or organizer role (must be used AFTER requireAuth).
+ */
+function requireAdminOrOrganizer(req, res, next) {
+  if (!req.sessionUser || !['admin', 'organizer'].includes(req.sessionUser.role)) {
+    return res.status(403).json({ error: 'Admin or organizer access required.' });
+  }
+  next();
+}
+
 // Register modular routes
 app.use('/api/otp', otpRoutes);
 app.use('/api/mail', mailRoutes);
@@ -488,7 +531,7 @@ app.get('/api/health/status', (req, res) => {
 });
 
 // Detailed metrics endpoint (admin only)
-app.get('/api/health/metrics', async (req, res) => {
+app.get('/api/health/metrics', requireAuth, requireAdmin, async (req, res) => {
   try {
     const metrics = getMetrics();
     const dbStats = await getDatabaseStats();
@@ -506,7 +549,7 @@ app.get('/api/health/metrics', async (req, res) => {
 });
 
 // Index maintenance endpoints (admin only)
-app.get('/api/admin/indexes', async (req, res) => {
+app.get('/api/admin/indexes', requireAuth, requireAdmin, async (req, res) => {
   try {
     const analysis = await analyzeAllIndexes();
     res.json(analysis);
@@ -515,7 +558,7 @@ app.get('/api/admin/indexes', async (req, res) => {
   }
 });
 
-app.get('/api/admin/indexes/:collection', async (req, res) => {
+app.get('/api/admin/indexes/:collection', requireAuth, requireAdmin, async (req, res) => {
   try {
     const stats = await getIndexStats(req.params.collection);
     res.json(stats);
@@ -524,7 +567,7 @@ app.get('/api/admin/indexes/:collection', async (req, res) => {
   }
 });
 
-app.post('/api/admin/indexes/validate/:collection', async (req, res) => {
+app.post('/api/admin/indexes/validate/:collection', requireAuth, requireAdmin, async (req, res) => {
   try {
     const result = await validateCollectionIndexes(req.params.collection);
     res.json(result);
@@ -533,7 +576,7 @@ app.post('/api/admin/indexes/validate/:collection', async (req, res) => {
   }
 });
 
-app.get('/api/admin/indexes/unused', async (req, res) => {
+app.get('/api/admin/indexes/unused', requireAuth, requireAdmin, async (req, res) => {
   try {
     const result = await findUnusedIndexes(req.query.threshold ? parseInt(req.query.threshold) : 10);
     res.json(result);
@@ -542,7 +585,7 @@ app.get('/api/admin/indexes/unused', async (req, res) => {
   }
 });
 
-app.post('/api/admin/maintenance/run', async (req, res) => {
+app.post('/api/admin/maintenance/run', requireAuth, requireAdmin, async (req, res) => {
   try {
     const result = await runFullMaintenance();
     res.json(result);
@@ -551,13 +594,13 @@ app.post('/api/admin/maintenance/run', async (req, res) => {
   }
 });
 
-app.get('/api/admin/maintenance/logs', (req, res) => {
+app.get('/api/admin/maintenance/logs', requireAuth, requireAdmin, (req, res) => {
   const limit = req.query.limit ? parseInt(req.query.limit) : 100;
   res.json(getMaintenanceLogs(limit));
 });
 
 // Cache statistics endpoints (admin only)
-app.get('/api/admin/cache/stats', (req, res) => {
+app.get('/api/admin/cache/stats', requireAuth, requireAdmin, (req, res) => {
   res.json({
     serverCache: serverCache.getStats(),
     mediaCache: mediaCacheService.getStats(),
@@ -565,7 +608,7 @@ app.get('/api/admin/cache/stats', (req, res) => {
   });
 });
 
-app.post('/api/admin/cache/clear', (req, res) => {
+app.post('/api/admin/cache/clear', requireAuth, requireAdmin, (req, res) => {
   const { type } = req.body;
   if (type === 'media') {
     mediaCacheService.clear();
@@ -578,7 +621,7 @@ app.post('/api/admin/cache/clear', (req, res) => {
   res.json({ success: true, message: `Cache cleared: ${type || 'all'}` });
 });
 
-app.post('/api/admin/cache/invalidate/:eventId', (req, res) => {
+app.post('/api/admin/cache/invalidate/:eventId', requireAuth, requireAdmin, (req, res) => {
   const { eventId } = req.params;
   const count = mediaCacheService.invalidateByEvent(eventId);
   invalidateCache.onGalleryChange(serverCache, eventId);
@@ -586,7 +629,7 @@ app.post('/api/admin/cache/invalidate/:eventId', (req, res) => {
 });
 
 // Alert endpoints (admin only)
-app.get('/api/admin/alerts', (req, res) => {
+app.get('/api/admin/alerts', requireAuth, requireAdmin, (req, res) => {
   res.json(getAlertHistory({
     limit: req.query.limit ? parseInt(req.query.limit) : 50,
     severity: req.query.severity,
@@ -595,15 +638,15 @@ app.get('/api/admin/alerts', (req, res) => {
   }));
 });
 
-app.get('/api/admin/alerts/stats', (req, res) => {
+app.get('/api/admin/alerts/stats', requireAuth, requireAdmin, (req, res) => {
   res.json(getAlertStats());
 });
 
-app.delete('/api/admin/alerts', (req, res) => {
+app.delete('/api/admin/alerts', requireAuth, requireAdmin, (req, res) => {
   res.json(clearAlertHistory());
 });
 
-app.post('/api/admin/alerts/test', async (req, res) => {
+app.post('/api/admin/alerts/test', requireAuth, requireAdmin, async (req, res) => {
   try {
     const result = await sendAlert({
       type: 'test_alert',
@@ -620,15 +663,13 @@ app.post('/api/admin/alerts/test', async (req, res) => {
 });
 
 // Cache statistics endpoint (admin only)
-app.get('/api/cache/stats', (req, res) => {
-  // In production, this should be admin-only
+app.get('/api/cache/stats', requireAuth, requireAdmin, (req, res) => {
   const stats = serverCache.getStats();
   res.json({ success: true, stats });
 });
 
 // Clear cache endpoint (admin only)
-app.post('/api/cache/clear', (req, res) => {
-  // In production, this should be admin-only with proper auth
+app.post('/api/cache/clear', requireAuth, requireAdmin, (req, res) => {
   serverCache.flush();
   res.json({ success: true, message: 'Cache cleared' });
 });
@@ -1883,7 +1924,7 @@ const notifyUser = async (req, userId, type, message, data = {}, priority = 'nor
 // --- Notification API Endpoints ---
 
 // Get all notifications for a user
-app.get('/api/notifications/:userId', async (req, res) => {
+app.get('/api/notifications/:userId', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
     const notifications = await Notification.find({ user: userId })
@@ -1897,7 +1938,7 @@ app.get('/api/notifications/:userId', async (req, res) => {
 });
 
 // Mark notification as read
-app.patch('/api/notifications/:notificationId/read', async (req, res) => {
+app.patch('/api/notifications/:notificationId/read', requireAuth, async (req, res) => {
   try {
     const { notificationId } = req.params;
     const { clicked } = req.body; // Track if notification was clicked
@@ -1925,7 +1966,7 @@ app.patch('/api/notifications/:notificationId/read', async (req, res) => {
 });
 
 // Delete all notifications for a user
-app.delete('/api/notifications/:userId', async (req, res) => {
+app.delete('/api/notifications/:userId', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
     await Notification.deleteMany({ user: userId });
@@ -1960,18 +2001,16 @@ app.get('/api/notifications/analytics/:eventId', async (req, res) => {
 });
 
 // Broadcast announcement to all users
-app.post('/api/announcements/broadcast', async (req, res) => {
+app.post('/api/announcements/broadcast', requireAuth, requireAdminOrOrganizer, async (req, res) => {
   try {
-    const { userId, title, message, priority = 'normal' } = req.body;
-
-    // Verify the sender is admin or organizer
-    const sender = await User.findById(userId);
-    if (!sender || (sender.role !== 'admin' && sender.role !== 'organizer')) {
-      return res.status(403).json({ error: 'Only admins and organizers can send announcements' });
-    }
+    const { title, message, priority = 'normal' } = req.body;
+    const userId = req.sessionUser._id;
 
     // Get all users with their notification preferences
     const allUsers = await User.find({});
+    
+    // Get sender name for the notification
+    const sender = await User.findById(userId).select('name role').lean();
     
     // Create notifications for all users
     const notifications = [];
@@ -2049,7 +2088,7 @@ app.post('/api/announcements/broadcast', async (req, res) => {
 });
 
 // Notification Preferences endpoints
-app.get('/api/notification-preferences/:userId', async (req, res) => {
+app.get('/api/notification-preferences/:userId', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
     let prefs = await NotificationPreferences.findOne({ userId });
@@ -2078,7 +2117,7 @@ app.get('/api/notification-preferences/:userId', async (req, res) => {
   }
 });
 
-app.patch('/api/notification-preferences/:userId', async (req, res) => {
+app.patch('/api/notification-preferences/:userId', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
     const updates = req.body;
@@ -2157,9 +2196,32 @@ app.post('/api/events/:eventId/waitlist/join', async (req, res) => {
   return app._router.handle(req, res);
 });
 
-app.get('/api/events/:eventId/waitlist', async (req, res) => {
+app.get('/api/events/:eventId/waitlist', requireAuth, async (req, res) => {
   try {
     const { eventId } = req.params;
+    const requestingUserId = req.sessionUser._id;
+
+    // Authorization: only event creator or admin can view waitlist
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    if (!requestingUserId) {
+      return res.status(401).json({ error: 'Authentication required to view waitlist' });
+    }
+
+    const requestingUser = await User.findById(requestingUserId);
+    if (!requestingUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const isOwner = event.organizerId.toString() === requestingUserId;
+    const isAdmin = requestingUser.role === 'admin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: 'Only the event creator and admins can view the waitlist' });
+    }
+
     const waitlist = await Waitlist.find({ eventId })
       .populate('userId', 'name email regId department year section')
       .sort({ position: 1 });
@@ -2188,14 +2250,10 @@ app.get('/api/events/:eventId/waitlist', async (req, res) => {
 });
 
 // Get current user's waitlist status for an event
-app.get('/api/events/:eventId/waitlist/status', async (req, res) => {
+app.get('/api/events/:eventId/waitlist/status', requireAuth, async (req, res) => {
   try {
     const { eventId } = req.params;
-    // Try authenticated user first, else accept ?userId
-    const userId = (req.user && req.user.userId) || req.query.userId;
-    if (!userId) {
-      return res.status(400).json({ error: 'userId required' });
-    }
+    const userId = req.sessionUser._id;
 
     const entry = await Waitlist.findOne({ eventId, userId });
     if (!entry) {
@@ -2209,10 +2267,10 @@ app.get('/api/events/:eventId/waitlist/status', async (req, res) => {
 });
 
 // Approve user from waitlist (admin/organizer only)
-app.post('/api/events/:eventId/waitlist/:waitlistId/approve', async (req, res) => {
+app.post('/api/events/:eventId/waitlist/:waitlistId/approve', requireAuth, async (req, res) => {
   try {
     const { eventId, waitlistId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.sessionUser._id;
     
     // Check if user is admin or organizer
     const user = await User.findById(userId);
@@ -2288,10 +2346,10 @@ app.post('/api/events/:eventId/waitlist/:waitlistId/approve', async (req, res) =
 });
 
 // Remove user from waitlist (admin/organizer only)
-app.delete('/api/events/:eventId/waitlist/:waitlistId', async (req, res) => {
+app.delete('/api/events/:eventId/waitlist/:waitlistId', requireAuth, async (req, res) => {
   try {
     const { eventId, waitlistId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.sessionUser._id;
     
     // Check if user is admin or organizer
     const user = await User.findById(userId);
@@ -2326,13 +2384,10 @@ app.delete('/api/events/:eventId/waitlist/:waitlistId', async (req, res) => {
 });
 
 // Alias for frontend: Leave waitlist (self-removal by user)
-app.delete('/api/events/:eventId/waitlist/leave', async (req, res) => {
+app.delete('/api/events/:eventId/waitlist/leave', requireAuth, async (req, res) => {
   try {
     const { eventId } = req.params;
-    const userId = (req.user && req.user.userId) || req.query.userId || req.body.userId;
-    if (!userId) {
-      return res.status(400).json({ error: 'userId required' });
-    }
+    const userId = req.sessionUser._id;
     const entry = await Waitlist.findOne({ eventId, userId });
     if (!entry) {
       return res.status(404).json({ error: 'Not on waitlist' });
@@ -2467,16 +2522,16 @@ app.get('/api/friends/:userId', async (req, res) => {
 });
 
 // Custom announcement endpoint for admins
-app.post('/api/events/:eventId/announce', async (req, res) => {
+app.post('/api/events/:eventId/announce', requireAuth, async (req, res) => {
   try {
     const { eventId } = req.params;
-    const { message, priority = 'normal', senderId } = req.body;
+    const { message, priority = 'normal' } = req.body;
+    const senderId = req.sessionUser._id;
     
     // Verify sender is admin or organizer
     const event = await Event.findById(eventId);
-    const sender = await User.findById(senderId);
     
-    if (sender.role !== 'admin' && event.organizerId.toString() !== senderId) {
+    if (req.sessionUser.role !== 'admin' && event.organizerId.toString() !== senderId.toString()) {
       return res.status(403).json({ error: 'Not authorized' });
     }
     
@@ -2504,11 +2559,12 @@ app.post('/api/events/:eventId/announce', async (req, res) => {
 });
 
 // Multi-Event Registration Endpoint
-app.post('/api/events/register-multiple', async (req, res) => {
+app.post('/api/events/register-multiple', requireAuth, async (req, res) => {
   try {
-    const { userId, eventIds } = req.body;
+    const userId = req.sessionUser._id;
+    const { eventIds } = req.body;
     
-    if (!userId || !eventIds || !Array.isArray(eventIds) || eventIds.length === 0) {
+    if (!eventIds || !Array.isArray(eventIds) || eventIds.length === 0) {
       return res.status(400).json({ error: 'Invalid request data' });
     }
 
@@ -2735,9 +2791,9 @@ app.post('/api/events/register-multiple', async (req, res) => {
 });
 
 // Single Event Registration (backwards compatibility)
-app.post('/api/events/:eventId/register', async (req, res) => {
+app.post('/api/events/:eventId/register', requireAuth, async (req, res) => {
   try {
-    const { userId } = req.body;
+    const userId = req.sessionUser._id;
     const eventId = req.params.eventId;
 
     // OPTIMIZATION: Fetch user, event, and existing registration in parallel
@@ -3048,6 +3104,17 @@ app.post('/api/events/:eventId/register', async (req, res) => {
         category: event.category,
         eventDescription: event.description,
       }).catch(err => console.error('Failed to send event registration email:', err.message));
+
+      // Background: Notify the event organizer (creator) about the new registration
+      if (event.organizerId && event.organizerId.toString() !== user._id.toString()) {
+        notifyUser(
+          req,
+          event.organizerId,
+          'registered',
+          `${user.name} has registered for your event '${event.title}'.`,
+          { eventId: event._id, eventTitle: event.title, eventImage: event.image, relatedUser: user._id }
+        ).catch(err => console.error('Organizer registration notification error:', err.message));
+      }
     } else {
       // Background: Notify user they're on the waiting list (non-blocking)
       notifyUser(
@@ -3087,10 +3154,10 @@ app.post('/api/events/:eventId/register', async (req, res) => {
 });
 
 // Get waiting list (pending registrations) for an event
-app.get('/api/events/:eventId/registrations/pending', async (req, res) => {
+app.get('/api/events/:eventId/registrations/pending', requireAuth, async (req, res) => {
   try {
     const eventId = req.params.eventId;
-    const { userId } = req.query; // Requesting user ID for authorization
+    const userId = req.sessionUser._id;
 
     // Find the event
     const event = await Event.findById(eventId);
@@ -3098,14 +3165,9 @@ app.get('/api/events/:eventId/registrations/pending', async (req, res) => {
       return res.status(404).json({ error: 'Event not found' });
     }
 
-    // Check if user is organizer or admin
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const isOrganizer = event.organizerId.toString() === userId;
-    const isAdmin = user.role === 'admin';
+    // Check if user is organizer or admin (from session)
+    const isOrganizer = event.organizerId.toString() === userId.toString();
+    const isAdmin = req.sessionUser.role === 'admin';
 
     if (!isOrganizer && !isAdmin) {
       return res.status(403).json({ error: 'Only event organizers and admins can view pending registrations' });
@@ -3131,10 +3193,10 @@ app.get('/api/events/:eventId/registrations/pending', async (req, res) => {
 });
 
 // Approve a pending registration
-app.post('/api/events/:eventId/registrations/:registrationId/approve', async (req, res) => {
+app.post('/api/events/:eventId/registrations/:registrationId/approve', requireAuth, async (req, res) => {
   try {
     const { eventId, registrationId } = req.params;
-    const { userId } = req.body; // Approving user ID
+    const userId = req.sessionUser._id;
 
     // Find the event
     const event = await Event.findById(eventId);
@@ -3142,14 +3204,9 @@ app.post('/api/events/:eventId/registrations/:registrationId/approve', async (re
       return res.status(404).json({ error: 'Event not found' });
     }
 
-    // Check authorization
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const isOrganizer = event.organizerId.toString() === userId;
-    const isAdmin = user.role === 'admin';
+    // Check authorization from session
+    const isOrganizer = event.organizerId.toString() === userId.toString();
+    const isAdmin = req.sessionUser.role === 'admin';
 
     if (!isOrganizer && !isAdmin) {
       return res.status(403).json({ error: 'Only event organizers and admins can approve registrations' });
@@ -3284,10 +3341,11 @@ app.post('/api/events/:eventId/registrations/:registrationId/approve', async (re
 });
 
 // Reject a pending registration
-app.post('/api/events/:eventId/registrations/:registrationId/reject', async (req, res) => {
+app.post('/api/events/:eventId/registrations/:registrationId/reject', requireAuth, async (req, res) => {
   try {
     const { eventId, registrationId } = req.params;
-    const { userId, reason } = req.body; // Rejecting user ID and optional reason
+    const { reason } = req.body;
+    const userId = req.sessionUser._id;
 
     // Find the event
     const event = await Event.findById(eventId);
@@ -3295,14 +3353,9 @@ app.post('/api/events/:eventId/registrations/:registrationId/reject', async (req
       return res.status(404).json({ error: 'Event not found' });
     }
 
-    // Check authorization
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const isOrganizer = event.organizerId.toString() === userId;
-    const isAdmin = user.role === 'admin';
+    // Check authorization from session
+    const isOrganizer = event.organizerId.toString() === userId.toString();
+    const isAdmin = req.sessionUser.role === 'admin';
 
     if (!isOrganizer && !isAdmin) {
       return res.status(403).json({ error: 'Only event organizers and admins can reject registrations' });
@@ -3591,7 +3644,7 @@ app.post('/api/qr/validate', async (req, res) => {
 });
 
 // Get Scan Logs for Admin
-app.get('/api/scan-logs', async (req, res) => {
+app.get('/api/scan-logs', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { eventId, userId, status } = req.query;
     
@@ -3613,7 +3666,7 @@ app.get('/api/scan-logs', async (req, res) => {
 });
 
 // Get all registrations
-app.get('/api/registrations', async (req, res) => {
+app.get('/api/registrations', requireAuth, requireAdmin, async (req, res) => {
   try {
     const registrations = await Registration.find()
       .populate('userId')
@@ -3646,9 +3699,9 @@ app.get('/api/registrations', async (req, res) => {
 });
 
 // Unregister from Event
-app.post('/api/events/:eventId/unregister', async (req, res) => {
+app.post('/api/events/:eventId/unregister', requireAuth, async (req, res) => {
   try {
-    const { userId } = req.body;
+    const userId = req.sessionUser._id;
     const eventId = req.params.eventId;
 
     // First, get the event to check if it's completed
@@ -3767,20 +3820,21 @@ app.post('/api/events/:eventId/unregister', async (req, res) => {
 });
 
 // Admin/Organizer: Remove participant from event
-app.post('/api/events/:eventId/remove-participant', async (req, res) => {
+app.post('/api/events/:eventId/remove-participant', requireAuth, async (req, res) => {
   try {
-    const { userId, removedBy } = req.body;
+    const { userId } = req.body;
     const eventId = req.params.eventId;
+    const removedBy = req.sessionUser._id;
 
-    // Find the user who is making the request (removedBy)
-    const remover = await User.findById(removedBy);
-    if (!remover) {
-      return res.status(403).json({ error: 'Unauthorized: User not found.' });
+    // Authorization: only event creator or admin can remove participants
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found.' });
     }
-
-    // Check if user has admin or organizer permissions
-    if (remover.role !== 'admin' && remover.role !== 'organizer') {
-      return res.status(403).json({ error: 'Unauthorized: Only admins and organizers can remove participants.' });
+    const isOwner = event.organizerId?.toString() === removedBy.toString();
+    const isAdmin = req.sessionUser.role === 'admin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized: Only the event creator and admins can remove participants.' });
     }
 
     // Find and remove the registration
@@ -3790,15 +3844,14 @@ app.post('/api/events/:eventId/remove-participant', async (req, res) => {
     }
 
     // Update event participant count
-    const event = await Event.findById(eventId);
-    if (event && event.currentParticipants > 0) {
+    if (event.currentParticipants > 0) {
       event.currentParticipants -= 1;
       await event.save();
     }
 
     // Get user info for logging
     const removedUser = await User.findById(userId);
-    console.log(`Admin/Organizer ${remover.name} (${remover.email}) removed participant ${removedUser?.name} (${removedUser?.email}) from event ${event?.title}`);
+    console.log(`Admin/Organizer ${req.sessionUser.name} removed participant ${removedUser?.name} (${removedUser?.email}) from event ${event?.title}`);
 
     res.json({ 
       success: true, 
@@ -4120,9 +4173,15 @@ app.post('/api/password-reset/reset', async (req, res) => {
 });
 
 // Update user profile
-app.put('/api/user/:id', async (req, res) => {
+app.put('/api/user/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Ownership check: only the user themselves or an admin can update
+    if (req.sessionUser._id.toString() !== id && req.sessionUser.role !== 'admin') {
+      return res.status(403).json({ error: 'You can only update your own profile.' });
+    }
+    
     const { name, email, department, section, mobile, year, regId, avatar, roomNo, college, admissionMonth, admissionYear, graduationYear, lateralEntry } = req.body;
 
     // Check for duplicate name (excluding current user)
@@ -4191,9 +4250,15 @@ app.put('/api/user/:id', async (req, res) => {
 });
 
 // Manual year update endpoint for students
-app.put('/api/user/:id/year', async (req, res) => {
+app.put('/api/user/:id/year', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Ownership check
+    if (req.sessionUser._id.toString() !== id && req.sessionUser.role !== 'admin') {
+      return res.status(403).json({ error: 'You can only update your own year.' });
+    }
+    
     const { year } = req.body;
     
     if (!year || year < 1 || year > 4) {
@@ -4226,9 +4291,15 @@ app.put('/api/user/:id/year', async (req, res) => {
 });
 
 // Update user privacy settings
-app.put('/api/user/:id/privacy', async (req, res) => {
+app.put('/api/user/:id/privacy', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Ownership check
+    if (req.sessionUser._id.toString() !== id && req.sessionUser.role !== 'admin') {
+      return res.status(403).json({ error: 'You can only update your own privacy settings.' });
+    }
+    
     const { privacySettings } = req.body;
     
     // Validate MongoDB ObjectId
@@ -4280,14 +4351,9 @@ app.put('/api/user/:id/privacy', async (req, res) => {
 });
 
 // Get organizer email notification settings
-app.get('/api/users/me/email-settings', async (req, res) => {
+app.get('/api/users/me/email-settings', requireAuth, async (req, res) => {
   try {
-    // Extract user ID from session or query
-    const userId = req.query.userId || (req.session && req.session.user && req.session.user._id);
-    
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized. User ID required.' });
-    }
+    const userId = req.sessionUser._id;
     
     const user = await User.findById(userId);
     
@@ -4318,14 +4384,10 @@ app.get('/api/users/me/email-settings', async (req, res) => {
 });
 
 // Update organizer email notification settings
-app.put('/api/users/me/email-settings', async (req, res) => {
+app.put('/api/users/me/email-settings', requireAuth, async (req, res) => {
   try {
-    const userId = req.query.userId || (req.user && req.user.userId) || req.body.userId;
+    const userId = req.sessionUser._id;
     const { emailPreferences } = req.body;
-    
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized. User ID required.' });
-    }
     
     if (!emailPreferences) {
       return res.status(400).json({ error: 'Email preferences are required.' });
@@ -4368,9 +4430,15 @@ app.put('/api/users/me/email-settings', async (req, res) => {
 });
 
 // Change user password
-app.put('/api/user/:id/password', async (req, res) => {
+app.put('/api/user/:id/password', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Ownership check: only the user themselves can change their own password
+    if (req.sessionUser._id.toString() !== id) {
+      return res.status(403).json({ error: 'You can only change your own password.' });
+    }
+    
     const { currentPassword, newPassword } = req.body;
     
     if (!currentPassword || !newPassword) {
@@ -4409,7 +4477,7 @@ app.put('/api/user/:id/password', async (req, res) => {
 
 // Admin endpoints for user management
 // Get all users (admin only)
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', requireAuth, requireAdmin, async (req, res) => {
   try {
     const users = await User.find().select('-password'); // Exclude password field
     res.json({ users });
@@ -4420,7 +4488,7 @@ app.get('/api/users', async (req, res) => {
 });
 
 // Get individual user by ID
-app.get('/api/users/:id', async (req, res) => {
+app.get('/api/users/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const user = await User.findById(id).select('-password');
@@ -4437,7 +4505,7 @@ app.get('/api/users/:id', async (req, res) => {
 });
 
 // Delete user by ID (admin only)
-app.delete('/api/users/:id', async (req, res) => {
+app.delete('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const user = await User.findByIdAndDelete(id);
@@ -4454,7 +4522,7 @@ app.delete('/api/users/:id', async (req, res) => {
 });
 
 // Update user by ID (admin only)
-app.put('/api/users/:id', async (req, res) => {
+app.put('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, email, department, section, mobile, year, regId, avatar, role, roomNo, admissionMonth, admissionYear, graduationYear, lateralEntry, college } = req.body;
@@ -4499,7 +4567,7 @@ app.put('/api/users/:id', async (req, res) => {
 });
 
 // Bulk promote/demote students by year (admin only)
-app.post('/api/admin/students/promote', async (req, res) => {
+app.post('/api/admin/students/promote', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { fromYear, toYear, action } = req.body;
     // action: 'promote' or 'demote'
@@ -4539,7 +4607,7 @@ app.post('/api/admin/students/promote', async (req, res) => {
 });
 
 // Create new user (admin only)  
-app.post('/api/users', async (req, res) => {
+app.post('/api/users', requireAuth, requireAdmin, async (req, res) => {
   try {
   const { name, email, password, role, department, section, mobile, year, regId, roomNo, college, admissionMonth, admissionYear, graduationYear, lateralEntry } = req.body;
     
@@ -4619,7 +4687,7 @@ app.post('/api/users', async (req, res) => {
 });
 
 // Admin: Create new user
-app.post('/api/admin/users', async (req, res) => {
+app.post('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
   try {
   const { name, email, password, role, department, section, mobile, year, regId, roomNo } = req.body;
     
@@ -4693,7 +4761,7 @@ app.post('/api/admin/users', async (req, res) => {
 });
 
 // Admin: Update any user's profile
-app.put('/api/admin/user/:id', async (req, res) => {
+app.put('/api/admin/user/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, email, department, section, mobile, year, regId, avatar, role } = req.body;
@@ -4717,7 +4785,7 @@ app.put('/api/admin/user/:id', async (req, res) => {
 });
 
 // Admin: Change any user's password
-app.put('/api/admin/user/:id/password', async (req, res) => {
+app.put('/api/admin/user/:id/password', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { newPassword } = req.body;
@@ -4751,7 +4819,7 @@ app.put('/api/admin/user/:id/password', async (req, res) => {
 });
 
 // Admin: Delete user
-app.delete('/api/admin/user/:id', async (req, res) => {
+app.delete('/api/admin/user/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -4771,7 +4839,7 @@ app.delete('/api/admin/user/:id', async (req, res) => {
 });
 
 // Admin: Bulk delete users (for other college users)
-app.delete('/api/admin/users/bulk-delete', async (req, res) => {
+app.delete('/api/admin/users/bulk-delete', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { adminId, userIds } = req.body;
     
@@ -4816,7 +4884,7 @@ app.delete('/api/admin/users/bulk-delete', async (req, res) => {
 // ========== SYSTEM SETTINGS & USER APPROVAL ==========
 
 // Get system settings (admin only)
-app.get('/api/admin/settings', async (req, res) => {
+app.get('/api/admin/settings', requireAuth, requireAdmin, async (req, res) => {
   try {
     const requireApproval = await getSystemSetting('requireRegistrationApproval', false);
     res.json({ 
@@ -4829,7 +4897,7 @@ app.get('/api/admin/settings', async (req, res) => {
 });
 
 // Update system settings (admin only)
-app.put('/api/admin/settings', async (req, res) => {
+app.put('/api/admin/settings', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { userId, requireRegistrationApproval } = req.body;
     
@@ -4855,7 +4923,7 @@ app.put('/api/admin/settings', async (req, res) => {
 });
 
 // Get pending users (admin only)
-app.get('/api/admin/users/pending', async (req, res) => {
+app.get('/api/admin/users/pending', requireAuth, requireAdmin, async (req, res) => {
   try {
     const pendingUsers = await User.find({ accountStatus: 'pending' })
       .select('-password')
@@ -4868,7 +4936,7 @@ app.get('/api/admin/users/pending', async (req, res) => {
 });
 
 // Approve user registration (admin only)
-app.put('/api/admin/users/:id/approve', async (req, res) => {
+app.put('/api/admin/users/:id/approve', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { adminId } = req.body;
     const { id } = req.params;
@@ -4914,7 +4982,7 @@ app.put('/api/admin/users/:id/approve', async (req, res) => {
 });
 
 // Reject user registration (admin only) - Deletes the account and sends rejection email
-app.put('/api/admin/users/:id/reject', async (req, res) => {
+app.put('/api/admin/users/:id/reject', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { adminId, reason } = req.body;
     const { id } = req.params;
@@ -4964,7 +5032,7 @@ app.put('/api/admin/users/:id/reject', async (req, res) => {
 });
 
 // Enable/Disable user account (admin only)
-app.put('/api/admin/users/:id/toggle-disable', async (req, res) => {
+app.put('/api/admin/users/:id/toggle-disable', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { adminId, reason, disable } = req.body; // disable: true to disable, false to enable
     const { id } = req.params;
@@ -5011,7 +5079,7 @@ app.put('/api/admin/users/:id/toggle-disable', async (req, res) => {
 });
 
 // Bulk approve users (admin only)
-app.put('/api/admin/users/bulk-approve', async (req, res) => {
+app.put('/api/admin/users/bulk-approve', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { adminId, userIds } = req.body;
     
@@ -5069,9 +5137,20 @@ app.put('/api/admin/users/bulk-approve', async (req, res) => {
 // Event Routes - with caching for high traffic
 app.get('/api/events', routeCache.events, async (req, res) => {
   try {
-    const events = await Event.find()
-      .populate('organizerId', 'name email role');
-    res.json(events);
+    const events = await Event.find().lean();
+    
+    // Manually attach organizer info (organizerId is String, not ObjectId ref)
+    const organizerIds = [...new Set(events.map(e => e.organizerId).filter(Boolean))];
+    const organizers = await User.find({ _id: { $in: organizerIds } }, 'name email role department').lean();
+    const organizerMap = {};
+    organizers.forEach(o => { organizerMap[o._id.toString()] = o; });
+    
+    const enrichedEvents = events.map(event => {
+      const organizer = event.organizerId ? organizerMap[event.organizerId] : null;
+      return { ...event, organizer: organizer || null };
+    });
+    
+    res.json(enrichedEvents);
   } catch (error) {
     console.error('Error fetching events:', error);
     res.status(500).json({ error: 'Failed to fetch events' });
@@ -5081,10 +5160,17 @@ app.get('/api/events', routeCache.events, async (req, res) => {
 // Get single event by ID - with caching
 app.get('/api/events/:id', routeCache.eventDetail, async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id).populate('organizerId', 'name email role');
+    const event = await Event.findById(req.params.id).lean();
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
     }
+    
+    // Manually attach organizer info (organizerId is String, not ObjectId ref)
+    if (event.organizerId) {
+      const organizer = await User.findById(event.organizerId, 'name email role department').lean();
+      event.organizer = organizer || null;
+    }
+    
     res.json(event);
   } catch (error) {
     console.error('Error fetching event:', error);
@@ -5172,10 +5258,15 @@ app.post('/api/events', async (req, res) => {
       collegeName,
       isTeamEvent,
       minTeamSize,
-      maxTeamSize
+      maxTeamSize,
+      isAlreadyCompleted
     } = req.body;
 
-    if (!title || !description || !category || !date || !time || !venue || !maxParticipants || !organizerId || !registrationDeadline) {
+    // Determine if this is an already-completed event
+    const alreadyCompleted = isAlreadyCompleted === true || isAlreadyCompleted === 'true';
+
+    // For already-completed events, registration deadline is not required
+    if (!title || !description || !category || !date || !time || !venue || !maxParticipants || !organizerId || (!registrationDeadline && !alreadyCompleted)) {
       return res.status(400).json({ error: 'All required fields must be filled.' });
     }
 
@@ -5191,18 +5282,19 @@ app.post('/api/events', async (req, res) => {
       image,
       requirements,
       prizes,
-      status,
-      registrationDeadline,
+      status: alreadyCompleted ? 'completed' : (status || 'upcoming'),
+      registrationDeadline: registrationDeadline || date,
       accessControl: accessControl || { type: 'everyone' },
       autoApproval: autoApproval !== undefined ? autoApproval : true,
       allowOtherColleges: allowOtherColleges || false,
       notifyAllUsers: notifyAllUsers || false,
       visibleToOthers: visibleToOthers === true || visibleToOthers === 'true' || false,
-      silentRelease: silentRelease === true || silentRelease === 'true' || false,
+      silentRelease: alreadyCompleted ? true : (silentRelease === true || silentRelease === 'true' || false),
       collegeName: collegeName || 'DVR & Dr. HS MIC College of Technology',
       isTeamEvent: isTeamEvent === true || isTeamEvent === 'true' || false,
       minTeamSize: parseInt(minTeamSize) || 2,
-      maxTeamSize: parseInt(maxTeamSize) || 4
+      maxTeamSize: parseInt(maxTeamSize) || 4,
+      ...(alreadyCompleted ? { completedAt: new Date() } : {})
     });
     await event.save();
     
@@ -5214,7 +5306,7 @@ app.post('/api/events', async (req, res) => {
     
     // ========== BACKGROUND PROCESSING (after response sent) ==========
     // --- NOTIFICATION (runs in background) ---
-    if (!event.silentRelease) {
+    if (!event.silentRelease && !alreadyCompleted) {
       // Run notification in background - don't await
       (async () => {
         try {
@@ -5375,10 +5467,15 @@ app.post('/api/events/create', uploadMiddleware.single('image'), async (req, res
       collegeName,
       isTeamEvent,
       minTeamSize,
-      maxTeamSize
+      maxTeamSize,
+      isAlreadyCompleted
     } = req.body;
 
-    if (!title || !description || !category || !date || !time || !venue || !maxParticipants || !organizerId || !registrationDeadline) {
+    // Determine if this is an already-completed event
+    const alreadyCompleted = isAlreadyCompleted === true || isAlreadyCompleted === 'true';
+
+    // For already-completed events, registration deadline is not required
+    if (!title || !description || !category || !date || !time || !venue || !maxParticipants || !organizerId || (!registrationDeadline && !alreadyCompleted)) {
       return res.status(400).json({ error: 'All required fields must be filled.' });
     }
 
@@ -5412,18 +5509,19 @@ app.post('/api/events/create', uploadMiddleware.single('image'), async (req, res
       imageOriginalName,
       requirements,
       prizes,
-      status,
-      registrationDeadline,
+      status: alreadyCompleted ? 'completed' : (status || 'upcoming'),
+      registrationDeadline: registrationDeadline || date,
       accessControl: accessControl || { type: 'everyone' },
       autoApproval: autoApproval !== undefined ? (autoApproval === 'true' || autoApproval === true) : true,
       allowOtherColleges: allowOtherColleges === 'true' || allowOtherColleges === true || false,
       notifyAllUsers: notifyAllUsers === 'true' || notifyAllUsers === true || false,
       visibleToOthers: visibleToOthers === 'true' || visibleToOthers === true || false,
-      silentRelease: silentRelease === 'true' || silentRelease === true || false,
+      silentRelease: alreadyCompleted ? true : (silentRelease === 'true' || silentRelease === true || false),
       collegeName: collegeName || 'DVR & Dr. HS MIC College of Technology',
       isTeamEvent: isTeamEvent === 'true' || isTeamEvent === true || false,
       minTeamSize: parseInt(minTeamSize) || 2,
-      maxTeamSize: parseInt(maxTeamSize) || 4
+      maxTeamSize: parseInt(maxTeamSize) || 4,
+      ...(alreadyCompleted ? { completedAt: new Date() } : {})
     });
     await event.save();
 
@@ -5492,8 +5590,8 @@ app.post('/api/events/create', uploadMiddleware.single('image'), async (req, res
     res.status(201).json({ event });
 
     // ========== BACKGROUND PROCESSING (after response sent) ==========
-    // Only send notifications if silentRelease is OFF
-    if (!event.silentRelease) {
+    // Only send notifications if silentRelease is OFF and event is not already completed
+    if (!event.silentRelease && !alreadyCompleted) {
       // Run notification in background - don't await
       (async () => {
         try {
@@ -5958,7 +6056,7 @@ app.delete('/api/user/:id/avatar', (req, res) => {
 });
 
 // UPDATE EVENT (PUT) - Update event with JSON body
-app.put('/api/events/:id', async (req, res) => {
+app.put('/api/events/:id', requireAuth, async (req, res) => {
   try {
     const {
       title,
@@ -5976,7 +6074,18 @@ app.put('/api/events/:id', async (req, res) => {
       return res.status(400).json({ error: 'All required fields must be filled.' });
     }
 
-    const oldEvent = await Event.findById(req.params.id).lean();
+    // Authorization check: only the event creator (organizer) or an admin can edit
+    const existingEvent = await Event.findById(req.params.id).lean();
+    if (!existingEvent) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    const requestingUserId = req.sessionUser._id; // From session, NOT from body
+    const eventOwnerId = existingEvent.organizerId?.toString();
+    if (req.sessionUser.role !== 'admin' && requestingUserId.toString() !== eventOwnerId) {
+      return res.status(403).json({ error: 'You can only edit events that you created.' });
+    }
+
+    const oldEvent = existingEvent;
     const event = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true });
     
     // Invalidate events cache after update
@@ -6228,18 +6337,10 @@ app.put('/api/events/:id', async (req, res) => {
 });
 
 // Manual event completion endpoint (for prize-based events)
-app.post('/api/events/:id/complete', async (req, res) => {
+app.post('/api/events/:id/complete', requireAuth, async (req, res) => {
   try {
-    const { userId, endSubEvents = true } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID required' });
-    }
-    
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    const { endSubEvents = true } = req.body;
+    const userId = req.sessionUser._id;
     
     const event = await Event.findById(req.params.id);
     if (!event) {
@@ -6247,7 +6348,7 @@ app.post('/api/events/:id/complete', async (req, res) => {
     }
     
     const isOrganizer = String(event.organizerId) === String(userId);
-    const isAdmin = user.role === 'admin';
+    const isAdmin = req.sessionUser.role === 'admin';
     
     if (!isOrganizer && !isAdmin) {
       return res.status(403).json({ error: 'Only organizers or admins can complete events' });
@@ -6299,17 +6400,13 @@ app.post('/api/events/:id/complete', async (req, res) => {
 });
 
 // Spot Registration endpoints
-app.post('/api/events/:id/spot-registrations', async (req, res) => {
+app.post('/api/events/:id/spot-registrations', requireAuth, async (req, res) => {
   try {
-    const { userId, participantName, identifier, notes } = req.body;
+    const { participantName, identifier, notes } = req.body;
+    const userId = req.sessionUser._id;
     
-    if (!userId || !participantName) {
-      return res.status(400).json({ error: 'User ID and participant name required' });
-    }
-    
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    if (!participantName) {
+      return res.status(400).json({ error: 'Participant name required' });
     }
     
     const event = await Event.findById(req.params.id);
@@ -6318,7 +6415,7 @@ app.post('/api/events/:id/spot-registrations', async (req, res) => {
     }
     
     const isOrganizer = String(event.organizerId) === String(userId);
-    const isAdmin = user.role === 'admin';
+    const isAdmin = req.sessionUser.role === 'admin';
     
     if (!isOrganizer && !isAdmin) {
       return res.status(403).json({ error: 'Only organizers or admins can add spot registrations' });
@@ -6358,14 +6455,9 @@ app.get('/api/events/:id/spot-registrations', async (req, res) => {
   }
 });
 
-app.delete('/api/events/:id/spot-registrations/:spotId', async (req, res) => {
+app.delete('/api/events/:id/spot-registrations/:spotId', requireAuth, async (req, res) => {
   try {
-    const { userId } = req.body;
-    
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    const userId = req.sessionUser._id;
     
     const event = await Event.findById(req.params.id);
     if (!event) {
@@ -6373,7 +6465,7 @@ app.delete('/api/events/:id/spot-registrations/:spotId', async (req, res) => {
     }
     
     const isOrganizer = String(event.organizerId) === String(userId);
-    const isAdmin = user.role === 'admin';
+    const isAdmin = req.sessionUser.role === 'admin';
     
     if (!isOrganizer && !isAdmin) {
       return res.status(403).json({ error: 'Only organizers or admins can delete spot registrations' });
@@ -6390,9 +6482,9 @@ app.delete('/api/events/:id/spot-registrations/:spotId', async (req, res) => {
 });
 
 // Results endpoint (alias for winners - used by frontend EventContext)
-app.post('/api/events/:id/results', async (req, res) => {
+app.post('/api/events/:id/results', requireAuth, async (req, res) => {
   try {
-    const { results, userId } = req.body;
+    const { results } = req.body;
     
     if (!results || !Array.isArray(results)) {
       return res.status(400).json({ error: 'Results array required' });
@@ -6403,16 +6495,16 @@ app.post('/api/events/:id/results', async (req, res) => {
       return res.status(404).json({ error: 'Event not found' });
     }
     
-    // Verify authorization if userId provided
-    if (userId) {
-      const user = await User.findById(userId);
-      if (user) {
-        const isOrganizer = String(event.organizerId) === String(userId);
-        const isAdmin = user.role === 'admin';
-        if (!isOrganizer && !isAdmin) {
-          return res.status(403).json({ error: 'Only organizers or admins can add results' });
-        }
-      }
+    // Verify authorization from session
+    const authUserId = req.sessionUser._id;
+    const authUser = await User.findById(authUserId);
+    if (!authUser) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    const isResultOrganizer = String(event.organizerId) === String(authUserId);
+    const isResultAdmin = authUser.role === 'admin';
+    if (!isResultOrganizer && !isResultAdmin) {
+      return res.status(403).json({ error: 'Only the event creator or admins can add results' });
     }
     
     // Mark event as completed if not already
@@ -6451,12 +6543,13 @@ app.post('/api/events/:id/results', async (req, res) => {
 });
 
 // Winner endpoints
-app.post('/api/events/:id/winners', async (req, res) => {
+app.post('/api/events/:id/winners', requireAuth, async (req, res) => {
   try {
-    const { userId, position, prize, participantType, participantUserId, spotRegistrationId, participantName } = req.body;
+    const { position, prize, participantType, participantUserId, spotRegistrationId, participantName } = req.body;
+    const userId = req.sessionUser._id;
     
-    if (!userId || !position || !participantType) {
-      return res.status(400).json({ error: 'User ID, position, and participant type required' });
+    if (!position || !participantType) {
+      return res.status(400).json({ error: 'Position and participant type required' });
     }
     
     const user = await User.findById(userId);
@@ -6585,14 +6678,9 @@ app.get('/api/events/:id/winners', async (req, res) => {
   }
 });
 
-app.delete('/api/events/:id/winners/:winnerId', async (req, res) => {
+app.delete('/api/events/:id/winners/:winnerId', requireAuth, async (req, res) => {
   try {
-    const { userId } = req.body;
-    
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    const userId = req.sessionUser._id;
     
     const event = await Event.findById(req.params.id);
     if (!event) {
@@ -6600,7 +6688,7 @@ app.delete('/api/events/:id/winners/:winnerId', async (req, res) => {
     }
     
     const isOrganizer = String(event.organizerId) === String(userId);
-    const isAdmin = user.role === 'admin';
+    const isAdmin = req.sessionUser.role === 'admin';
     
     if (!isOrganizer && !isAdmin) {
       return res.status(403).json({ error: 'Only organizers or admins can remove winners' });
@@ -6674,25 +6762,19 @@ app.get('/api/events/:id/eligible-winners', async (req, res) => {
 });
 
 
-// Bulk delete events
-app.delete('/api/events', async (req, res) => {
-  try {
-    const { eventIds } = req.body;
-    if (!Array.isArray(eventIds) || eventIds.length === 0) {
-      return res.status(400).json({ error: 'No event IDs provided.' });
-    }
-    const result = await Event.deleteMany({ _id: { $in: eventIds } });
-    res.json({ success: true, deletedCount: result.deletedCount });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-app.delete('/api/events/:id', async (req, res) => {
+app.delete('/api/events/:id', requireAuth, async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
+    }
+
+    // Authorization: only event creator or admin can delete (using session)
+    const requestingUserId = req.sessionUser._id;
+    const isOwner = event.organizerId?.toString() === requestingUserId.toString();
+    const isAdmin = req.sessionUser.role === 'admin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: 'You can only delete events that you created.' });
     }
 
     // Find all registrations for this event to notify users
@@ -6754,11 +6836,22 @@ app.delete('/api/events/:id', async (req, res) => {
 });
 
 // Delete multiple events
-app.delete('/api/events', async (req, res) => {
+app.delete('/api/events', requireAuth, async (req, res) => {
   try {
     const { eventIds } = req.body;
     if (!Array.isArray(eventIds) || eventIds.length === 0) {
       return res.status(400).json({ error: 'No event IDs provided.' });
+    }
+
+    // Authorization: only event creator or admin can delete (using session)
+    const requestingUserId = req.sessionUser._id;
+    if (req.sessionUser.role !== 'admin') {
+      // Non-admin: verify they own ALL events in the batch
+      const eventsToDelete = await Event.find({ _id: { $in: eventIds } }).select('organizerId').lean();
+      const unauthorized = eventsToDelete.filter(e => e.organizerId?.toString() !== requestingUserId.toString());
+      if (unauthorized.length > 0) {
+        return res.status(403).json({ error: 'You can only delete events that you created.' });
+      }
     }
 
     // For each event, find registrations and notify users
@@ -7191,18 +7284,13 @@ console.log('⏰ Automated monitoring and maintenance jobs initialized');
 
 // Event Analytics Endpoints
 // Analytics endpoints
-app.post('/api/analytics/events', async (req, res) => {
+app.post('/api/analytics/events', requireAuth, async (req, res) => {
   try {
-    const { userId } = req.body;
-    const user = await User.findById(userId);
-    
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    const userId = req.sessionUser._id;
     
     // Build query based on user role
     let eventQuery = {};
-    if (user.role !== 'admin') {
+    if (req.sessionUser.role !== 'admin') {
       // For organizers, only show their events
       eventQuery = { organizerId: userId };
     }
@@ -7284,23 +7372,18 @@ app.post('/api/analytics/events', async (req, res) => {
 });
 
 // Single event analytics
-app.post('/api/analytics/events/:eventId', async (req, res) => {
+app.post('/api/analytics/events/:eventId', requireAuth, async (req, res) => {
   try {
     const { eventId } = req.params;
-    const { userId } = req.body;
-    const user = await User.findById(userId);
-    
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    const userId = req.sessionUser._id;
     
     const event = await Event.findById(eventId);
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
     }
     
-    // Check authorization
-    if (user.role !== 'admin' && event.organizerId.toString() !== userId) {
+    // Check authorization from session
+    if (req.sessionUser.role !== 'admin' && event.organizerId.toString() !== userId.toString()) {
       return res.status(403).json({ error: 'Not authorized' });
     }
     
@@ -7350,17 +7433,13 @@ app.post('/api/analytics/events/:eventId', async (req, res) => {
 });
 
 // Broadcast announcement to all users
-app.post('/api/notifications/broadcast', async (req, res) => {
+app.post('/api/notifications/broadcast', requireAuth, requireAdminOrOrganizer, async (req, res) => {
   try {
-    const { title, message, userId, priority } = req.body;
-    
-    // Verify the sender is admin or organizer
-    const sender = await User.findById(userId);
-    if (!sender || (sender.role !== 'admin' && sender.role !== 'organizer')) {
-      return res.status(403).json({ error: 'Unauthorized. Only admins and organizers can send announcements.' });
-    }
+    const { title, message, priority } = req.body;
+    const userId = req.sessionUser._id;
 
-    // Get all users
+    // Get sender info and all users
+    const sender = await User.findById(userId).select('name role').lean();
     const allUsers = await User.find({});
     let emailsSent = 0;
     
@@ -7450,22 +7529,18 @@ app.post('/api/notifications/broadcast', async (req, res) => {
 });
 
 // Targeted broadcast announcement to specific users only
-app.post('/api/notifications/broadcast/targeted', async (req, res) => {
+app.post('/api/notifications/broadcast/targeted', requireAuth, requireAdminOrOrganizer, async (req, res) => {
   try {
-    const { title, message, userId, priority, targetUserIds } = req.body;
-    
-    // Verify the sender is admin or organizer
-    const sender = await User.findById(userId);
-    if (!sender || (sender.role !== 'admin' && sender.role !== 'organizer')) {
-      return res.status(403).json({ error: 'Unauthorized. Only admins and organizers can send announcements.' });
-    }
+    const { title, message, priority, targetUserIds } = req.body;
+    const userId = req.sessionUser._id;
 
     // Validate target users
     if (!targetUserIds || !Array.isArray(targetUserIds) || targetUserIds.length === 0) {
       return res.status(400).json({ error: 'Please select at least one user to send the announcement.' });
     }
 
-    // Get only the selected users
+    // Get sender info and target users
+    const sender = await User.findById(userId).select('name role').lean();
     const targetUsers = await User.find({ _id: { $in: targetUserIds } });
     
     if (targetUsers.length === 0) {
@@ -7709,7 +7784,7 @@ app.post('/api/events/:eventId/sub-events', async (req, res) => {
 });
 
 // Update sub-event
-app.put('/api/sub-events/:subEventId', async (req, res) => {
+app.put('/api/sub-events/:subEventId', requireAuth, async (req, res) => {
   try {
     const { subEventId } = req.params;
     const updateData = req.body;
@@ -7757,7 +7832,7 @@ app.put('/api/sub-events/:subEventId', async (req, res) => {
 });
 
 // Delete sub-event
-app.delete('/api/sub-events/:subEventId', async (req, res) => {
+app.delete('/api/sub-events/:subEventId', requireAuth, async (req, res) => {
   try {
     const { subEventId } = req.params;
     
@@ -11807,12 +11882,12 @@ app.post('/api/events/:eventId/process-pending-invites', async (req, res) => {
 // ================================
 
 // Admin endpoint for rate limit stats
-app.get('/api/admin/rate-limits', (req, res) => {
+app.get('/api/admin/rate-limits', requireAuth, requireAdmin, (req, res) => {
   res.json(getRateLimitStats());
 });
 
 // Admin endpoint for error stats
-app.get('/api/admin/errors', (req, res) => {
+app.get('/api/admin/errors', requireAuth, requireAdmin, (req, res) => {
   res.json(getErrorStats());
 });
 

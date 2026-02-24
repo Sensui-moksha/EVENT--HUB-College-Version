@@ -288,11 +288,11 @@ const EventDetails: React.FC = () => {
   }, [userId, id]);
 
   const fetchWaitlistUsers = useCallback(async () => {
-    if (!id) return;
+    if (!id || !userId) return;
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/events/${id}/waitlist`, {
+      const response = await fetch(`${API_BASE_URL}/api/events/${id}/waitlist?userId=${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -305,18 +305,18 @@ const EventDetails: React.FC = () => {
     } catch (error) {
       console.error('Error fetching waitlist:', error);
     }
-  }, [id]);
+  }, [id, userId]);
 
   // Check waitlist status on component mount
   useEffect(() => {
     if (id && userId) {
       checkWaitlistStatus();
-      // Fetch waitlist users for admin/organizer
-      if (userRole === 'admin' || userRole === 'organizer') {
+      // Fetch waitlist users for admin/event owner
+      if (isPrivileged) {
         fetchWaitlistUsers();
       }
     }
-  }, [id, userId, userRole, checkWaitlistStatus, fetchWaitlistUsers]);
+  }, [id, userId, isPrivileged, checkWaitlistStatus, fetchWaitlistUsers]);
 
   // Fetch team invitations for this event
   useEffect(() => {
@@ -1146,9 +1146,12 @@ const EventDetails: React.FC = () => {
   }, [event, user]);
 
   // Compute isPrivileged early (before early returns) so hooks can use it
+  // Only the event creator (organizer) or admin can manage (edit/delete) the event
   const isPrivileged = useMemo(() => {
     if (!event) return false;
-    return user?.role === 'admin' || user?.role === 'organizer' || userId === event?.organizerId;
+    if (user?.role === 'admin') return true;
+    // For organizers, only the event creator is privileged
+    return userId === event?.organizerId;
   }, [event, user?.role, userId]);
 
   // Fetch winners/spot registrations for completed events - must be before early returns
@@ -1843,13 +1846,16 @@ const EventDetails: React.FC = () => {
                   <div className="flex items-center text-gray-600 text-sm sm:text-base">
                     <User className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3 text-blue-500 flex-shrink-0" />
                     <span className="break-words">
-                      Organized by {
-                        // Check multiple possible formats for organizer data
-                        event.organizer?.name || 
-                        (typeof event.organizerId === 'object' && event.organizerId && (event.organizerId as UserType)?.name) ||
-                        (event.organizer && typeof event.organizer === 'object' && event.organizer.name) ||
-                        'Unknown'
-                      }
+                      Organized by{' '}
+                      <span className="font-medium">
+                        {event.organizer?.name || 'Unknown'}
+                      </span>
+                      {event.organizer?.department && (
+                        <>
+                          <span className="text-gray-400 mx-1">•</span>
+                          <span className="text-gray-500">{event.organizer.department}</span>
+                        </>
+                      )}
                     </span>
                   </div>
                 </div>
@@ -2004,7 +2010,7 @@ const EventDetails: React.FC = () => {
                 <Images className="w-5 h-5" />
                 <span>View Gallery</span>
               </Link>
-              {(user?.role === 'admin' || user?.role === 'organizer') && (
+              {isPrivileged && (
                 <Link
                   to={`/dashboard/gallery/${id}`}
                   className="flex-1 px-4 sm:px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-medium flex items-center justify-center space-x-2 text-sm sm:text-base shadow-lg"
@@ -2307,8 +2313,8 @@ const EventDetails: React.FC = () => {
                     </>
                   )}
                   
-                  {/* Admin/Organizer Actions */}
-                  {(user.role === 'admin' || user.role === 'organizer') && (
+                  {/* Admin/Event Creator Actions */}
+                  {isPrivileged && (
                     <div className="space-y-3">
                       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                         <button
@@ -3350,11 +3356,11 @@ const EventDetails: React.FC = () => {
             <div className="overflow-x-auto min-h-[400px]">
               <table className="min-w-full bg-white border border-gray-200 rounded-lg table-fixed">
                 <colgroup>
-                  {(user?.role === 'admin' || user?.role === 'organizer') && (
+                  {isPrivileged && (
                     <col className="w-24" />
                   )}
                   <col className="w-36" />
-                  {(user?.role === 'admin' || user?.role === 'organizer') && (
+                  {isPrivileged && (
                     <col className="w-56" />
                   )}
                   <col className="w-20" />
@@ -3366,17 +3372,17 @@ const EventDetails: React.FC = () => {
                   )}
                   <col className="w-28" />
                   <col className="w-36" />
-                  {(user?.role === 'admin' || user?.role === 'organizer') && (
+                  {isPrivileged && (
                     <col className="w-24" />
                   )}
                 </colgroup>
                 <thead>
                   <tr>
-                    {(user?.role === 'admin' || user?.role === 'organizer') && (
+                    {isPrivileged && (
                       <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Reg. ID</th>
                     )}
                     <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Name</th>
-                    {(user?.role === 'admin' || user?.role === 'organizer') && (
+                    {isPrivileged && (
                       <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Email</th>
                     )}
                     <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Dept</th>
@@ -3388,7 +3394,7 @@ const EventDetails: React.FC = () => {
                     )}
                     <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Registered At</th>
                     <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Approval Type</th>
-                    {(user?.role === 'admin' || user?.role === 'organizer') && (
+                    {isPrivileged && (
                       <th className="px-2 py-3 border-b text-left text-xs font-semibold text-gray-700">Actions</th>
                     )}
                   </tr>
@@ -3402,7 +3408,7 @@ const EventDetails: React.FC = () => {
                       animate={{ opacity: 1 }}
                       transition={{ duration: 0.6, ease: "easeOut" }}
                     >
-                      {(user?.role === 'admin' || user?.role === 'organizer') && (
+                      {isPrivileged && (
                         <td className="px-2 py-3 text-xs text-gray-800">{reg.user?.regId ?? reg.id}</td>
                       )}
                       <td className="px-2 py-3 text-xs">
@@ -3417,7 +3423,7 @@ const EventDetails: React.FC = () => {
                           <span className="text-gray-800">{reg.user?.name ?? '-'}</span>
                         )}
                       </td>
-                      {(user?.role === 'admin' || user?.role === 'organizer') && (
+                      {isPrivileged && (
                         <td className="px-2 py-3 text-xs text-gray-800 break-words">{reg.user?.email ?? '-'}</td>
                       )}
                       <td className="px-2 py-3 text-xs text-gray-800">{reg.user?.department ?? '-'}</td>
@@ -3477,7 +3483,7 @@ const EventDetails: React.FC = () => {
                           </span>
                         )}
                       </td>
-                      {(user?.role === 'admin' || user?.role === 'organizer') && (
+                      {isPrivileged && (
                         <td className="px-2 py-3 text-xs">
                           <button
                             onClick={() => handleRemoveParticipant(
@@ -3561,10 +3567,8 @@ const EventDetails: React.FC = () => {
         </div>
         )}
 
-        {/* Approval Waiting List Section - Only for organizers/admins */}
-        {(user?.role === 'admin' || 
-          user?.role === 'organizer' || 
-          userId === event.organizerId) && (
+        {/* Approval Waiting List Section - Only for event owner/admins */}
+        {isPrivileged && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -3719,11 +3723,7 @@ const EventDetails: React.FC = () => {
         >
           <SubEventsList 
             eventId={id!} 
-            canCreateSubEvent={
-              user?.role === 'admin' || 
-              user?.role === 'organizer' || 
-              userId === event.organizerId
-            } 
+            canCreateSubEvent={isPrivileged} 
           />
         </motion.div>
 
