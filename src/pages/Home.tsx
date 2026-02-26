@@ -25,8 +25,7 @@ const Home: React.FC = () => {
 
   const upcomingEvents = events
     .filter(event => event.status === 'upcoming')
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 3);
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const eventsRef = useRef<HTMLDivElement | null>(null);
 
