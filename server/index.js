@@ -1390,7 +1390,7 @@ const subEventRegistrationSchema = new mongoose.Schema({
     scannedAt: { type: Date, default: Date.now },
     scannedBy: String,
     location: String,
-    status: { type: String, enum: ['valid', 'invalid', 'expired', 'duplicate'], required: true },
+    status: { type: String, enum: ['valid', 'invalid', 'expired', 'duplicate', 'reverted'], required: true },
     notes: String
   }]
 });
@@ -1556,7 +1556,7 @@ const registrationSchema = new mongoose.Schema({
     scannedAt: { type: Date, default: Date.now },
     scannedBy: String,
     location: String,
-    status: { type: String, enum: ['valid', 'invalid', 'expired', 'duplicate'], required: true },
+    status: { type: String, enum: ['valid', 'invalid', 'expired', 'duplicate', 'reverted'], required: true },
     notes: String
   }]
 });

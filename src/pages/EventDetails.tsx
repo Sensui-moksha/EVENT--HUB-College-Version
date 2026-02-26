@@ -53,8 +53,9 @@ const EventDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { events, registrations, registerForEvent, unregisterFromEvent, removeParticipant, markAttendance, undoAttendance, deleteEvent, loading } = useEvents();
+  const { events, registrations, registerForEvent, unregisterFromEvent, removeParticipant, deleteEvent, loading } = useEvents();
   const [markingAttended, setMarkingAttended] = useState<Record<string, boolean>>({});
+  const [localAttendedStatus, setLocalAttendedStatus] = useState<Record<string, 'attended' | 'registered'>>({});
   const { addToast } = useToast();
   const [showQR, setShowQR] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -1587,26 +1588,37 @@ const EventDetails: React.FC = () => {
     setConfirmRemoveParticipant({ userId, userName });
   };
 
-  // Mark/unmark attendance via EventContext
+  // Mark/unmark attendance
   const handleToggleAttendance = async (reg: Registration) => {
     if (!event) return;
     const regId = (reg as any)._id || reg.id;
-    const isAttended = reg.status === 'attended';
+    const currentStatus = localAttendedStatus[regId] || reg.status;
+    const isAttended = currentStatus === 'attended';
+    const endpoint = isAttended ? 'undo-attended' : 'mark-attended';
 
     setMarkingAttended(prev => ({ ...prev, [regId]: true }));
     try {
-      const success = isAttended
-        ? await undoAttendance(event.id || (event as any)._id, regId)
-        : await markAttendance(event.id || (event as any)._id, regId);
-
-      if (success) {
+      const response = await fetch(`${API_BASE_URL}/api/events/${event.id || (event as any)._id}/registrations/${regId}/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        // Update local state immediately for instant UI feedback
+        setLocalAttendedStatus(prev => ({
+          ...prev,
+          [regId]: isAttended ? 'registered' : 'attended'
+        }));
         addToast({
           type: 'success',
           title: isAttended ? 'Attendance Reverted' : 'Marked as Attended',
           message: `${reg.user?.name || 'User'} has been ${isAttended ? 'unmarked' : 'marked as attended'}.`,
         });
+        // Also refresh context data in background
+        window.dispatchEvent(new Event('forceRefresh'));
       } else {
-        addToast({ type: 'error', title: 'Error', message: 'Failed to update attendance.' });
+        addToast({ type: 'error', title: 'Error', message: data.error || 'Failed to update attendance.' });
       }
     } catch (err) {
       addToast({ type: 'error', title: 'Error', message: 'Failed to update attendance.' });
@@ -3513,27 +3525,31 @@ const EventDetails: React.FC = () => {
                       </td>
                       {isPrivileged && (
                         <td className="px-2 py-3 text-xs">
-                          {reg.status === 'attended' ? (
-                            <button
-                              onClick={() => handleToggleAttendance(reg)}
-                              disabled={markingAttended[(reg as any)._id || reg.id]}
-                              className="px-2 py-1 bg-green-600 text-white text-[10px] rounded hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center space-x-1"
-                              title="Click to undo attendance"
-                            >
-                              <CheckCircle className="w-3 h-3" />
-                              <span>Attended</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleToggleAttendance(reg)}
-                              disabled={markingAttended[(reg as any)._id || reg.id]}
-                              className="px-2 py-1 bg-yellow-500 text-white text-[10px] rounded hover:bg-yellow-600 transition-colors disabled:opacity-50 flex items-center space-x-1"
-                              title="Mark as attended"
-                            >
-                              <Clock className="w-3 h-3" />
-                              <span>Mark Attended</span>
-                            </button>
-                          )}
+                          {(() => {
+                            const regId = (reg as any)._id || reg.id;
+                            const effectiveStatus = localAttendedStatus[regId] || reg.status;
+                            return effectiveStatus === 'attended' ? (
+                              <button
+                                onClick={() => handleToggleAttendance(reg)}
+                                disabled={markingAttended[regId]}
+                                className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center space-x-1"
+                                title="Click to undo attendance"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Undo Attended</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleToggleAttendance(reg)}
+                                disabled={markingAttended[regId]}
+                                className="px-2 py-1 bg-yellow-500 text-white text-[10px] rounded hover:bg-yellow-600 transition-colors disabled:opacity-50 flex items-center space-x-1"
+                                title="Mark as attended"
+                              >
+                                <Clock className="w-3 h-3" />
+                                <span>Mark Attended</span>
+                              </button>
+                            );
+                          })()}
                         </td>
                       )}
                       {isPrivileged && (

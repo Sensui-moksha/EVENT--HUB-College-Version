@@ -520,7 +520,7 @@ const EventAnalytics: React.FC = () => {
                   {/* Quick Stats Row */}
                   <motion.div
                     variants={itemVariants}
-                    className="grid grid-cols-2 md:grid-cols-5 gap-4"
+                    className="grid grid-cols-2 gap-4"
                   >
                     <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-500/30">
                       <div className="flex items-center gap-3">
@@ -537,33 +537,6 @@ const EventAnalytics: React.FC = () => {
                         <div>
                           <div className="text-2xl font-bold">{analytics.completedEvents}</div>
                           <div className="text-emerald-100 text-sm">Completed</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-teal-500 to-teal-600 rounded-2xl p-5 text-white shadow-lg shadow-teal-500/30">
-                      <div className="flex items-center gap-3">
-                        <Users className="w-8 h-8 opacity-80" />
-                        <div>
-                          <div className="text-2xl font-bold">{analytics.totalAttended}</div>
-                          <div className="text-teal-100 text-sm">Attended</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl p-5 text-white shadow-lg shadow-red-500/30">
-                      <div className="flex items-center gap-3">
-                        <CalendarX className="w-8 h-8 opacity-80" />
-                        <div>
-                          <div className="text-2xl font-bold">{analytics.cancelledEvents}</div>
-                          <div className="text-red-100 text-sm">Cancelled</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-5 text-white shadow-lg shadow-purple-500/30">
-                      <div className="flex items-center gap-3">
-                        <Flame className="w-8 h-8 opacity-80" />
-                        <div>
-                          <div className="text-2xl font-bold">{insights?.fullyBookedEvents || 0}</div>
-                          <div className="text-purple-100 text-sm">Fully Booked</div>
                         </div>
                       </div>
                     </div>
