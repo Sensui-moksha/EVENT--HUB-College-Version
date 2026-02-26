@@ -7644,15 +7644,16 @@ app.post('/api/analytics/events', requireAuth, async (req, res) => {
       .sort((a, b) => b.registrations - a.registrations)
       .slice(0, 10);
     
-    // Recent registrations
+    // All registrations (no limit)
     const recentRegistrations = registrations
       .sort((a, b) => new Date(b.registeredAt) - new Date(a.registeredAt))
-      .slice(0, 20)
       .map(reg => ({
         eventTitle: reg.eventId?.title || 'Unknown Event',
         userName: reg.userId?.name || 'Unknown User',
         registeredAt: reg.registeredAt,
-        fromWaitlist: reg.fromWaitlist || false
+        fromWaitlist: reg.fromWaitlist || false,
+        status: reg.status || 'registered',
+        approvalStatus: reg.approvalStatus || 'approved'
       }));
     
     res.json({
@@ -7702,15 +7703,16 @@ app.post('/api/analytics/events/:eventId', requireAuth, async (req, res) => {
     const totalParticipants = registrations.filter(r => r.approvalStatus === 'approved').length;
     const totalAttended = registrations.filter(r => r.status === 'attended').length;
     
-    // Recent registrations
+    // All registrations (no limit)
     const recentRegistrations = registrations
       .sort((a, b) => new Date(b.registeredAt) - new Date(a.registeredAt))
-      .slice(0, 20)
       .map(reg => ({
         eventTitle: event.title,
         userName: reg.userId?.name || 'Unknown User',
         registeredAt: reg.registeredAt,
-        fromWaitlist: reg.fromWaitlist || false
+        fromWaitlist: reg.fromWaitlist || false,
+        status: reg.status || 'registered',
+        approvalStatus: reg.approvalStatus || 'approved'
       }));
     
     res.json({
