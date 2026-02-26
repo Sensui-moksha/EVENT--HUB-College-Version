@@ -13,6 +13,8 @@ interface EventContextType {
   registerForMultipleEvents: (eventIds: string[]) => Promise<MultiEventRegistration>;
   unregisterFromEvent: (eventId: string) => Promise<boolean>;
   removeParticipant: (eventId: string, userId: string) => Promise<boolean>;
+  markAttendance: (eventId: string, registrationId: string) => Promise<boolean>;
+  undoAttendance: (eventId: string, registrationId: string) => Promise<boolean>;
   validateQRCode: (qrData: string, eventId?: string, scannedBy?: string, location?: string) => Promise<QRValidationResult>;
   createEvent: (eventData: Omit<Event, 'id' | 'createdAt' | 'currentParticipants' | 'organizer'>) => Promise<boolean>;
   updateEvent: (eventId: string, eventData: Partial<Event>) => Promise<boolean>;
@@ -572,6 +574,66 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
     }
   };
 
+  const markAttendance = async (eventId: string, registrationId: string): Promise<boolean> => {
+    if (!user) return false;
+    setLoading(true);
+    try {
+      const event = events.find(e => e.id === eventId || (e as any)._id === eventId);
+      const backendEventId = event ? ((event as any)._id || event.id) : eventId;
+
+      const res = await fetch(`${API_BASE_URL}/api/events/${backendEventId}/registrations/${registrationId}/mark-attended`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      });
+      const data = await parseResponse(res);
+      if (res.ok && data.success) {
+        // Update local registration state immediately
+        setRegistrations(prev => prev.map(r => {
+          const rId = (r as any)._id || r.id;
+          return rId === registrationId ? { ...r, status: 'attended' as const } : r;
+        }));
+        await refreshData();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Mark attendance failed:', error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const undoAttendance = async (eventId: string, registrationId: string): Promise<boolean> => {
+    if (!user) return false;
+    setLoading(true);
+    try {
+      const event = events.find(e => e.id === eventId || (e as any)._id === eventId);
+      const backendEventId = event ? ((event as any)._id || event.id) : eventId;
+
+      const res = await fetch(`${API_BASE_URL}/api/events/${backendEventId}/registrations/${registrationId}/undo-attended`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      });
+      const data = await parseResponse(res);
+      if (res.ok && data.success) {
+        // Update local registration state immediately
+        setRegistrations(prev => prev.map(r => {
+          const rId = (r as any)._id || r.id;
+          return rId === registrationId ? { ...r, status: 'registered' as const } : r;
+        }));
+        await refreshData();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Undo attendance failed:', error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const createEvent = async (eventData: Omit<Event, 'id' | 'createdAt' | 'currentParticipants' | 'organizer'>): Promise<boolean> => {
     if (!user) return false;
     setLoading(true);
@@ -717,6 +779,8 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
     registerForMultipleEvents,
     unregisterFromEvent,
     removeParticipant,
+    markAttendance,
+    undoAttendance,
     validateQRCode,
     createEvent,
     updateEvent,

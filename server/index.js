@@ -3520,6 +3520,123 @@ app.get('/api/events/:eventId/attendees', async (req, res) => {
   }
 });
 
+// Mark registration as attended (manual)
+app.post('/api/events/:eventId/registrations/:registrationId/mark-attended', requireAuth, requireAdminOrOrganizer, async (req, res) => {
+  try {
+    const { eventId, registrationId } = req.params;
+    const registration = await Registration.findOne({ _id: registrationId, eventId })
+      .populate('userId', '-password')
+      .populate('eventId', 'autoApproval title');
+
+    if (!registration) {
+      return res.status(404).json({ error: 'Registration not found.' });
+    }
+
+    if (registration.status === 'attended') {
+      return res.status(400).json({ error: 'Already marked as attended.' });
+    }
+
+    if (registration.approvalStatus !== 'approved') {
+      return res.status(400).json({ error: 'Only approved registrations can be marked as attended.' });
+    }
+
+    registration.status = 'attended';
+    registration.scanLogs.push({
+      scannedAt: new Date(),
+      scannedBy: req.sessionUser._id.toString(),
+      location: 'manual',
+      status: 'valid',
+      notes: 'Manually marked as attended by organizer/admin'
+    });
+    await registration.save();
+
+    const regObj = registration.toObject();
+    regObj.user = regObj.userId;
+    regObj.event = regObj.eventId;
+    regObj.userId = regObj.userId._id;
+    regObj.eventId = regObj.eventId._id;
+    regObj.id = regObj._id;
+
+    res.json({ success: true, registration: regObj });
+  } catch (err) {
+    console.error('Error marking attended:', err);
+    res.status(500).json({ error: 'Failed to mark as attended.' });
+  }
+});
+
+// Undo mark attended (revert to registered)
+app.post('/api/events/:eventId/registrations/:registrationId/undo-attended', requireAuth, requireAdminOrOrganizer, async (req, res) => {
+  try {
+    const { eventId, registrationId } = req.params;
+    const registration = await Registration.findOne({ _id: registrationId, eventId })
+      .populate('userId', '-password')
+      .populate('eventId', 'autoApproval title');
+
+    if (!registration) {
+      return res.status(404).json({ error: 'Registration not found.' });
+    }
+
+    if (registration.status !== 'attended') {
+      return res.status(400).json({ error: 'Registration is not marked as attended.' });
+    }
+
+    registration.status = 'registered';
+    registration.scanLogs.push({
+      scannedAt: new Date(),
+      scannedBy: req.sessionUser._id.toString(),
+      location: 'manual',
+      status: 'reverted',
+      notes: 'Attendance reverted by organizer/admin'
+    });
+    await registration.save();
+
+    const regObj = registration.toObject();
+    regObj.user = regObj.userId;
+    regObj.event = regObj.eventId;
+    regObj.userId = regObj.userId._id;
+    regObj.eventId = regObj.eventId._id;
+    regObj.id = regObj._id;
+
+    res.json({ success: true, registration: regObj });
+  } catch (err) {
+    console.error('Error undoing attended:', err);
+    res.status(500).json({ error: 'Failed to undo attended status.' });
+  }
+});
+
+// Get registrations for a specific user (for UserProfile)
+app.get('/api/users/:userId/registrations', requireAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const regs = await Registration.find({ userId })
+      .populate('userId', '-password')
+      .populate('eventId', 'title date status image category autoApproval')
+      .sort({ registeredAt: -1 });
+
+    const formattedRegs = regs
+      .filter(reg => reg.userId && reg.eventId)
+      .map(reg => {
+        const regObj = reg.toObject();
+        if (!regObj.approvalType && regObj.approvalStatus === 'approved') {
+          if (regObj.fromWaitlist) regObj.approvalType = 'waitingListApproval';
+          else if (regObj.eventId && regObj.eventId.autoApproval) regObj.approvalType = 'autoApproved';
+          else regObj.approvalType = 'manualApproved';
+        }
+        regObj.user = regObj.userId;
+        regObj.event = regObj.eventId;
+        regObj.userId = regObj.userId._id;
+        regObj.eventId = regObj.eventId._id;
+        regObj.id = regObj._id;
+        return regObj;
+      });
+
+    res.json({ registrations: formattedRegs });
+  } catch (err) {
+    console.error('Error fetching user registrations:', err);
+    res.status(500).json({ error: 'Failed to fetch user registrations.' });
+  }
+});
+
 // QR Code Validation Endpoint
 app.post('/api/qr/validate', async (req, res) => {
   try {
@@ -7482,7 +7599,8 @@ app.post('/api/analytics/events', requireAuth, async (req, res) => {
       .populate('eventId', 'title image maxParticipants date status');
     
     const totalRegistrations = registrations.length;
-    const totalParticipants = registrations.filter(r => r.status === 'attended').length;
+    const totalParticipants = registrations.filter(r => r.approvalStatus === 'approved').length;
+    const totalAttended = registrations.filter(r => r.status === 'attended').length;
     const averageRegistrationsPerEvent = totalEvents > 0 ? totalRegistrations / totalEvents : 0;
     
     // Category breakdown
@@ -7544,6 +7662,7 @@ app.post('/api/analytics/events', requireAuth, async (req, res) => {
       cancelledEvents,
       totalRegistrations,
       totalParticipants,
+      totalAttended,
       averageRegistrationsPerEvent,
       categoryBreakdown,
       topEvents,
@@ -7580,7 +7699,8 @@ app.post('/api/analytics/events/:eventId', requireAuth, async (req, res) => {
       .populate('eventId', 'title image maxParticipants date status');
     
     const totalRegistrations = registrations.length;
-    const totalParticipants = registrations.filter(r => r.status === 'attended').length;
+    const totalParticipants = registrations.filter(r => r.approvalStatus === 'approved').length;
+    const totalAttended = registrations.filter(r => r.status === 'attended').length;
     
     // Recent registrations
     const recentRegistrations = registrations
@@ -7600,6 +7720,7 @@ app.post('/api/analytics/events/:eventId', requireAuth, async (req, res) => {
       cancelledEvents: event.status === 'cancelled' ? 1 : 0,
       totalRegistrations,
       totalParticipants,
+      totalAttended,
       averageRegistrationsPerEvent: totalRegistrations,
       categoryBreakdown: [{ category: event.category, count: 1 }],
       topEvents: [{

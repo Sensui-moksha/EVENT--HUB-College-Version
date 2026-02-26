@@ -86,19 +86,30 @@ const UserProfile: React.FC = () => {
         const data = await response.json();
         setUserData(data.user);
         
-        // Calculate stats
-        const userRegs = registrations.filter(r => 
-          (r.userId === userId || (typeof r.userId === 'object' && (r.userId as any)._id === userId))
-        );
+        // Fetch user's registrations from dedicated backend endpoint
+        let userRegs: any[] = [];
+        try {
+          const regsResponse = await fetch(`/api/users/${userId}/registrations`);
+          if (regsResponse.ok) {
+            const regsData = await regsResponse.json();
+            userRegs = regsData.registrations || [];
+          }
+        } catch (err) {
+          console.error('Error fetching user registrations:', err);
+          // Fallback to context registrations
+          userRegs = registrations.filter(r => 
+            (r.userId === userId || (typeof r.userId === 'object' && (r.userId as any)._id === userId))
+          );
+        }
         
         const userOrganizedEvents = events.filter(e => 
           e.organizerId === userId || (typeof e.organizerId === 'object' && (e.organizerId as any)._id === userId)
         );
         
-        const attended = userRegs.filter(r => r.status === 'attended').length;
-        const upcoming = userRegs.filter(r => {
-          const event = events.find(e => e.id === r.eventId || (e as any)._id === r.eventId);
-          return event?.status === 'upcoming';
+        const attended = userRegs.filter((r: any) => r.status === 'attended').length;
+        const upcoming = userRegs.filter((r: any) => {
+          const evt = r.event || events.find((e: any) => e.id === r.eventId || e._id === r.eventId);
+          return evt?.status === 'upcoming';
         }).length;
 
         setUserStats({
@@ -108,11 +119,11 @@ const UserProfile: React.FC = () => {
           upcomingEvents: upcoming
         });
 
-        // Get user's registered events with registration details
-        const userEventsList = userRegs.map(reg => {
-          const event = events.find(e => e.id === reg.eventId || (e as any)._id === reg.eventId);
-          return event ? { ...event, registration: reg } : null;
-        }).filter(Boolean).slice(0, 5);
+        // Get ALL user's registered events with registration details
+        const userEventsList = userRegs.map((reg: any) => {
+          const evt = reg.event || events.find((e: any) => e.id === reg.eventId || e._id === reg.eventId);
+          return evt ? { ...evt, registration: reg } : null;
+        }).filter(Boolean);
         
         setUserEvents(userEventsList);
       }
@@ -399,11 +410,12 @@ const UserProfile: React.FC = () => {
             animate="visible"
             transition={{ delay: 0.3 }}
           >
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Recent Events</h2>
-            <div className="space-y-3">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Registered Events ({userEvents.length})</h2>
+            <div className="space-y-3 max-h-[600px] overflow-y-auto">
               {userEvents.map((event: any, index: number) => {
                 const registration = event.registration;
                 const approvalStatus = registration?.approvalStatus || 'approved';
+                const attendanceStatus = registration?.status;
                 
                 return (
                   <div 
@@ -454,13 +466,21 @@ const UserProfile: React.FC = () => {
                         {event.status}
                       </span>
                       
+                      {/* Attendance Status Badge */}
+                      {attendanceStatus === 'attended' && (
+                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" />
+                          Attended
+                        </span>
+                      )}
+
                       {/* Approval Status Badge */}
                       {approvalStatus === 'pending' && (
                         <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
                           Pending
                         </span>
                       )}
-                      {approvalStatus === 'approved' && registration && (
+                      {approvalStatus === 'approved' && registration && attendanceStatus !== 'attended' && (
                         <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-300">
                           Approved
                         </span>

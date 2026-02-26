@@ -73,6 +73,7 @@ interface EventAnalytics {
   cancelledEvents: number;
   totalRegistrations: number;
   totalParticipants: number;
+  totalAttended: number;
   averageRegistrationsPerEvent: number;
   categoryBreakdown: { category: string; count: number }[];
   registrationTrends: { date: string; count: number }[];
@@ -201,8 +202,8 @@ const EventAnalytics: React.FC = () => {
       ? ((analytics.completedEvents / analytics.totalEvents) * 100)
       : 0;
     
-    const attendanceRate = analytics.totalRegistrations > 0
-      ? ((analytics.totalParticipants / analytics.totalRegistrations) * 100)
+    const attendanceRate = analytics.totalParticipants > 0
+      ? ((analytics.totalAttended / analytics.totalParticipants) * 100)
       : 0;
     
     const fullyBookedEvents = analytics.topEvents.filter(e => e.registrations >= e.capacity).length;
@@ -398,7 +399,7 @@ const EventAnalytics: React.FC = () => {
               {activeTab === 'overview' && (
                 <>
                   {/* Key Metrics Cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Total Events */}
                     <motion.div
                       variants={itemVariants}
@@ -457,6 +458,35 @@ const EventAnalytics: React.FC = () => {
                       </div>
                     </motion.div>
 
+                    {/* Total Attended */}
+                    <motion.div
+                      variants={itemVariants}
+                      whileHover={cardHover}
+                      className="bg-white rounded-2xl p-6 shadow-md border border-gray-200 ring-1 ring-gray-100 relative overflow-hidden group"
+                    >
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-teal-500/10 to-cyan-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500" />
+                      <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="p-2.5 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl shadow-lg shadow-teal-500/30">
+                            <CheckCircle className="w-5 h-5 text-white" />
+                          </div>
+                          <span className="text-xs font-medium text-teal-600 bg-teal-50 px-2 py-1 rounded-full">
+                            Attended
+                          </span>
+                        </div>
+                        <div className="text-3xl font-bold text-gray-900 mb-1">
+                          {analytics.totalAttended}
+                        </div>
+                        <p className="text-sm text-gray-500">Total Attended</p>
+                        <div className="mt-3 flex items-center gap-2 text-xs">
+                          <span className="flex items-center text-teal-600 bg-teal-50 px-2 py-1 rounded-full">
+                            <Activity className="w-3 h-3 mr-1" />
+                            {analytics.totalParticipants > 0 ? ((analytics.totalAttended / analytics.totalParticipants) * 100).toFixed(1) : 0}% attendance rate
+                          </span>
+                        </div>
+                      </div>
+                    </motion.div>
+
                     {/* Success Rate */}
                     <motion.div
                       variants={itemVariants}
@@ -490,7 +520,7 @@ const EventAnalytics: React.FC = () => {
                   {/* Quick Stats Row */}
                   <motion.div
                     variants={itemVariants}
-                    className="grid grid-cols-2 md:grid-cols-4 gap-4"
+                    className="grid grid-cols-2 md:grid-cols-5 gap-4"
                   >
                     <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-500/30">
                       <div className="flex items-center gap-3">
@@ -507,6 +537,15 @@ const EventAnalytics: React.FC = () => {
                         <div>
                           <div className="text-2xl font-bold">{analytics.completedEvents}</div>
                           <div className="text-emerald-100 text-sm">Completed</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-br from-teal-500 to-teal-600 rounded-2xl p-5 text-white shadow-lg shadow-teal-500/30">
+                      <div className="flex items-center gap-3">
+                        <Users className="w-8 h-8 opacity-80" />
+                        <div>
+                          <div className="text-2xl font-bold">{analytics.totalAttended}</div>
+                          <div className="text-teal-100 text-sm">Attended</div>
                         </div>
                       </div>
                     </div>
