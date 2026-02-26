@@ -358,21 +358,24 @@ export const TimePicker: React.FC<TimePickerProps> = ({
       </div>
 
       {/* Clock Picker — portal-based centered overlay (works on mobile & desktop) */}
-      <AnimatePresence>
-        {isOpen && ReactDOM.createPortal(
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4"
-            onClick={() => setIsOpen(false)}
-          >
-            {pickerCard}
-          </motion.div>,
-          document.body
-        )}
-      </AnimatePresence>
+      {ReactDOM.createPortal(
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              key="timepicker-overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4"
+              onClick={() => setIsOpen(false)}
+            >
+              {pickerCard}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 };
