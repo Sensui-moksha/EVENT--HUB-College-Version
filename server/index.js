@@ -1147,6 +1147,25 @@ userSchema.index({ role: 1, college: 1 }); // Compound index for role + college 
 userSchema.index({ accountStatus: 1 }); // For admin approval queries
 userSchema.index({ createdAt: -1 }); // For sorting by creation date
 
+// Auto-uppercase regId before saving
+userSchema.pre('save', function(next) {
+  if (this.regId && this.isModified('regId')) {
+    this.regId = this.regId.toUpperCase();
+  }
+  next();
+});
+
+userSchema.pre('findOneAndUpdate', function(next) {
+  const update = this.getUpdate();
+  if (update && update.regId) {
+    update.regId = update.regId.toUpperCase();
+  }
+  if (update && update.$set && update.$set.regId) {
+    update.$set.regId = update.$set.regId.toUpperCase();
+  }
+  next();
+});
+
 const User = mongoose.model('User', userSchema);
 
 // Connect User model to admin email service for dynamic admin notifications
@@ -1293,6 +1312,18 @@ const winnerSchema = new mongoose.Schema({
 });
 winnerSchema.index({ eventId: 1, position: 1 }, { unique: true });
 const Winner = mongoose.model('Winner', winnerSchema);
+
+// API Credential Schema - for Mentors/External API access
+const apiCredentialSchema = new mongoose.Schema({
+  name: { type: String, required: true }, // Friendly name, e.g. "Mentor Dashboard"
+  username: { type: String, required: true, unique: true },
+  passwordHash: { type: String, required: true },
+  isActive: { type: Boolean, default: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  lastUsedAt: { type: Date },
+  createdAt: { type: Date, default: Date.now }
+});
+const ApiCredential = mongoose.model('ApiCredential', apiCredentialSchema);
 
 // Sub-Event Schema - Events within main events
 const subEventSchema = new mongoose.Schema({
@@ -4058,7 +4089,7 @@ app.post('/api/register', async (req, res) => {
     
     // Check for duplicate registration ID if provided
     if (regId) {
-      const existingRegId = await User.findOne({ regId });
+      const existingRegId = await User.findOne({ regId: regId.toUpperCase() });
       if (existingRegId) {
         return res.status(409).json({ error: 'This Registration ID (Roll Number) is already in use.' });
       }
@@ -4089,7 +4120,7 @@ app.post('/api/register', async (req, res) => {
       admissionMonth: role === 'student' ? admissionMonth : undefined,
       admissionYear: role === 'student' ? admissionYear : undefined,
       graduationYear: role === 'student' ? graduationYear : undefined,
-      regId, 
+      regId: regId ? regId.toUpperCase() : undefined, 
       section, 
       roomNo,
       accountStatus
@@ -4887,7 +4918,7 @@ app.post('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
   roomNo: roomNo || '',
       mobile,
   year: role === 'faculty' ? undefined : year,
-      regId: regId || `USER-${Date.now()}`,
+      regId: regId ? regId.toUpperCase() : `USER-${Date.now()}`,
       branch: department // Set branch same as department for compatibility
     });
     
@@ -7648,6 +7679,7 @@ app.post('/api/analytics/events', requireAuth, async (req, res) => {
     const recentRegistrations = registrations
       .sort((a, b) => new Date(b.registeredAt) - new Date(a.registeredAt))
       .map(reg => ({
+        userId: reg.userId?._id?.toString() || '',
         eventTitle: reg.eventId?.title || 'Unknown Event',
         userName: reg.userId?.name || 'Unknown User',
         registeredAt: reg.registeredAt,
@@ -7707,6 +7739,7 @@ app.post('/api/analytics/events/:eventId', requireAuth, async (req, res) => {
     const recentRegistrations = registrations
       .sort((a, b) => new Date(b.registeredAt) - new Date(a.registeredAt))
       .map(reg => ({
+        userId: reg.userId?._id?.toString() || '',
         eventTitle: event.title,
         userName: reg.userId?.name || 'Unknown User',
         registeredAt: reg.registeredAt,
@@ -12201,6 +12234,458 @@ app.get('/api/admin/rate-limits', requireAuth, requireAdmin, (req, res) => {
 // Admin endpoint for error stats
 app.get('/api/admin/errors', requireAuth, requireAdmin, (req, res) => {
   res.json(getErrorStats());
+});
+
+// ================================
+// MENTORS API CREDENTIAL MANAGEMENT
+// ================================
+
+// List all API credentials (admin only)
+app.get('/api/admin/api-credentials', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const credentials = await ApiCredential.find()
+      .populate('createdBy', 'name email')
+      .sort({ createdAt: -1 })
+      .lean();
+    // Never send password hashes to frontend
+    const safe = credentials.map(c => ({
+      _id: c._id,
+      name: c.name,
+      username: c.username,
+      isActive: c.isActive,
+      createdBy: c.createdBy,
+      lastUsedAt: c.lastUsedAt,
+      createdAt: c.createdAt
+    }));
+    res.json(safe);
+  } catch (err) {
+    console.error('Error fetching API credentials:', err);
+    res.status(500).json({ error: 'Failed to fetch API credentials' });
+  }
+});
+
+// Create a new API credential (admin only)
+app.post('/api/admin/api-credentials', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { name, username, password } = req.body;
+    if (!name || !username || !password) {
+      return res.status(400).json({ error: 'Name, username, and password are required.' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    }
+    const existing = await ApiCredential.findOne({ username });
+    if (existing) {
+      return res.status(409).json({ error: 'Username already exists.' });
+    }
+    const passwordHash = await bcrypt.hash(password, 10);
+    const cred = await ApiCredential.create({
+      name,
+      username,
+      passwordHash,
+      createdBy: req.sessionUser._id
+    });
+    res.status(201).json({
+      _id: cred._id,
+      name: cred.name,
+      username: cred.username,
+      isActive: cred.isActive,
+      createdAt: cred.createdAt
+    });
+  } catch (err) {
+    console.error('Error creating API credential:', err);
+    res.status(500).json({ error: 'Failed to create API credential' });
+  }
+});
+
+// Update API credential (toggle active, change password) (admin only)
+app.put('/api/admin/api-credentials/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, password, isActive } = req.body;
+    const cred = await ApiCredential.findById(id);
+    if (!cred) return res.status(404).json({ error: 'Credential not found.' });
+
+    if (name !== undefined) cred.name = name;
+    if (isActive !== undefined) cred.isActive = isActive;
+    if (password) {
+      if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+      cred.passwordHash = await bcrypt.hash(password, 10);
+    }
+    await cred.save();
+    res.json({ success: true, _id: cred._id, name: cred.name, username: cred.username, isActive: cred.isActive });
+  } catch (err) {
+    console.error('Error updating API credential:', err);
+    res.status(500).json({ error: 'Failed to update API credential' });
+  }
+});
+
+// Delete API credential (admin only)
+app.delete('/api/admin/api-credentials/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await ApiCredential.findByIdAndDelete(id);
+    if (!deleted) return res.status(404).json({ error: 'Credential not found.' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting API credential:', err);
+    res.status(500).json({ error: 'Failed to delete API credential' });
+  }
+});
+
+// ================================
+// EXTERNAL READ-ONLY RESTFUL API
+// ================================
+
+// Basic Auth middleware for external API
+async function requireApiAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Basic ')) {
+    res.set('WWW-Authenticate', 'Basic realm="Mentors API"');
+    return res.status(401).json({ error: 'Authentication required. Use Basic Auth with your API credentials.' });
+  }
+  try {
+    const base64 = authHeader.split(' ')[1];
+    const decoded = Buffer.from(base64, 'base64').toString('utf-8');
+    const [username, password] = decoded.split(':');
+    const cred = await ApiCredential.findOne({ username, isActive: true });
+    if (!cred) {
+      return res.status(401).json({ error: 'Invalid credentials or credential is disabled.' });
+    }
+    const valid = await bcrypt.compare(password, cred.passwordHash);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid credentials.' });
+    }
+    // Update last used timestamp
+    cred.lastUsedAt = new Date();
+    await cred.save();
+    req.apiCredential = cred;
+    next();
+  } catch (err) {
+    console.error('API auth error:', err);
+    res.status(500).json({ error: 'Authentication failed.' });
+  }
+}
+
+// GET /api/external/users - List all users (minimal info)
+app.get('/api/external/users', requireApiAuth, async (req, res) => {
+  try {
+    const { department, year, search, page = 1, limit = 50 } = req.query;
+    const query = { accountStatus: 'approved', role: { $nin: ['admin', 'organizer'] } };
+    if (department) query.department = department;
+    if (year) query.year = Number(year);
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { regId: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+    const skip = (Number(page) - 1) * Number(limit);
+    const total = await User.countDocuments(query);
+    const users = await User.find(query)
+      .select('name email regId department year section college')
+      .sort({ name: 1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .lean();
+    res.json({
+      users: users.map(u => ({
+        id: u._id,
+        name: u.name,
+        email: u.email,
+        regId: u.regId,
+        department: u.department,
+        year: u.year,
+        section: u.section,
+        college: u.college
+      })),
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        totalPages: Math.ceil(total / Number(limit))
+      }
+    });
+  } catch (err) {
+    console.error('External API - list users error:', err);
+    res.status(500).json({ error: 'Failed to fetch users.' });
+  }
+});
+
+// GET /api/external/users/:userId - Full user data with events, attendance, prizes
+app.get('/api/external/users/:userId', requireApiAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId)
+      .select('name email regId department year section college role')
+      .lean();
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    if (['admin', 'organizer'].includes(user.role)) {
+      return res.status(403).json({ error: 'This user profile is not accessible via the external API.' });
+    }
+
+    // Get all registrations
+    const registrations = await Registration.find({ userId })
+      .populate('eventId', 'title date status category venue')
+      .sort({ registeredAt: -1 })
+      .lean();
+
+    const attendedEvents = registrations
+      .filter(r => r.status === 'attended')
+      .map(r => ({
+        eventId: r.eventId?._id,
+        title: r.eventId?.title,
+        date: r.eventId?.date,
+        category: r.eventId?.category,
+        venue: r.eventId?.venue,
+        registeredAt: r.registeredAt
+      }));
+
+    const registeredEvents = registrations
+      .filter(r => r.approvalStatus === 'approved')
+      .map(r => ({
+        eventId: r.eventId?._id,
+        title: r.eventId?.title,
+        date: r.eventId?.date,
+        status: r.eventId?.status,
+        category: r.eventId?.category,
+        venue: r.eventId?.venue,
+        attendanceStatus: r.status,
+        registeredAt: r.registeredAt
+      }));
+
+    const upcomingEvents = registrations
+      .filter(r => r.eventId?.status === 'upcoming' && r.approvalStatus === 'approved')
+      .map(r => ({
+        eventId: r.eventId?._id,
+        title: r.eventId?.title,
+        date: r.eventId?.date,
+        category: r.eventId?.category,
+        venue: r.eventId?.venue,
+        registeredAt: r.registeredAt
+      }));
+
+    // Get prizes/winners
+    const winners = await Winner.find({ userId })
+      .populate('eventId', 'title date category')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const prizes = winners.map(w => ({
+      eventId: w.eventId?._id,
+      eventTitle: w.eventId?.title,
+      eventDate: w.eventId?.date,
+      position: w.position,
+      prize: w.prize
+    }));
+
+    // Also check sub-event winners
+    const subEventWinners = await SubEventWinner.find({ userId })
+      .populate('subEventId', 'title parentEventId')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Get parent event details for sub-event winners
+    const parentEventIds = [...new Set(subEventWinners.map(w => w.subEventId?.parentEventId).filter(Boolean))];
+    const parentEvents = await Event.find({ _id: { $in: parentEventIds } }).select('title date').lean();
+    const parentEventMap = {};
+    parentEvents.forEach(e => { parentEventMap[e._id.toString()] = e; });
+
+    const subEventPrizes = subEventWinners.map(w => ({
+      subEventId: w.subEventId?._id,
+      subEventTitle: w.subEventId?.title,
+      parentEventTitle: parentEventMap[w.subEventId?.parentEventId?.toString()]?.title || 'Unknown',
+      parentEventDate: parentEventMap[w.subEventId?.parentEventId?.toString()]?.date,
+      position: w.position,
+      prize: w.prize
+    }));
+
+    res.json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        regId: user.regId,
+        department: user.department,
+        year: user.year,
+        section: user.section,
+        college: user.college
+      },
+      stats: {
+        totalRegistered: registeredEvents.length,
+        totalAttended: attendedEvents.length,
+        totalUpcoming: upcomingEvents.length,
+        totalPrizes: prizes.length + subEventPrizes.length
+      },
+      registeredEvents,
+      attendedEvents,
+      upcomingEvents,
+      prizes,
+      subEventPrizes
+    });
+  } catch (err) {
+    console.error('External API - user detail error:', err);
+    res.status(500).json({ error: 'Failed to fetch user data.' });
+  }
+});
+
+// GET /api/external/events - List all events
+app.get('/api/external/events', requireApiAuth, async (req, res) => {
+  try {
+    const { status, category, page = 1, limit = 50 } = req.query;
+    const query = {};
+    if (status) query.status = status;
+    if (category) query.category = category;
+    const skip = (Number(page) - 1) * Number(limit);
+    const total = await Event.countDocuments(query);
+    const events = await Event.find(query)
+      .select('title description category date time venue maxParticipants currentParticipants status prizes image')
+      .sort({ date: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .lean();
+
+    res.json({
+      events: events.map(e => ({
+        id: e._id,
+        title: e.title,
+        description: e.description,
+        category: e.category,
+        date: e.date,
+        time: e.time,
+        venue: e.venue,
+        maxParticipants: e.maxParticipants,
+        currentParticipants: e.currentParticipants,
+        status: e.status,
+        prizes: e.prizes,
+        image: e.image
+      })),
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        totalPages: Math.ceil(total / Number(limit))
+      }
+    });
+  } catch (err) {
+    console.error('External API - list events error:', err);
+    res.status(500).json({ error: 'Failed to fetch events.' });
+  }
+});
+
+// GET /api/external/events/:eventId/registrations - List registrations for an event
+app.get('/api/external/events/:eventId/registrations', requireApiAuth, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const event = await Event.findById(eventId).select('title date status').lean();
+    if (!event) return res.status(404).json({ error: 'Event not found.' });
+
+    const registrations = await Registration.find({ eventId })
+      .populate('userId', 'name email regId department year section role')
+      .sort({ registeredAt: -1 })
+      .lean();
+
+    // Filter out admin and organizer users from registrations
+    const filteredRegistrations = registrations.filter(r => 
+      r.userId && !['admin', 'organizer'].includes(r.userId.role)
+    );
+
+    res.json({
+      event: { id: event._id, title: event.title, date: event.date, status: event.status },
+      registrations: filteredRegistrations.map(r => ({
+        userName: r.userId?.name || 'Unknown',
+        userEmail: r.userId?.email,
+        userRegId: r.userId?.regId,
+        department: r.userId?.department,
+        year: r.userId?.year,
+        status: r.status,
+        approvalStatus: r.approvalStatus,
+        registeredAt: r.registeredAt
+      }))
+    });
+  } catch (err) {
+    console.error('External API - event registrations error:', err);
+    res.status(500).json({ error: 'Failed to fetch registrations.' });
+  }
+});
+
+// GET /api/external/events/:eventId/winners - List winners for an event
+app.get('/api/external/events/:eventId/winners', requireApiAuth, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const event = await Event.findById(eventId).select('title date').lean();
+    if (!event) return res.status(404).json({ error: 'Event not found.' });
+
+    const winners = await Winner.find({ eventId })
+      .populate('userId', 'name email regId department role')
+      .sort({ position: 1 })
+      .lean();
+
+    // Filter out admin and organizer users from winners
+    const filteredWinners = winners.filter(w => 
+      !w.userId || !['admin', 'organizer'].includes(w.userId.role)
+    );
+
+    res.json({
+      event: { id: event._id, title: event.title, date: event.date },
+      winners: filteredWinners.map(w => ({
+        position: w.position,
+        prize: w.prize,
+        participantType: w.participantType,
+        participantName: w.participantName || w.userId?.name || 'Unknown',
+        userEmail: w.userId?.email,
+        userRegId: w.userId?.regId,
+        department: w.userId?.department
+      }))
+    });
+  } catch (err) {
+    console.error('External API - event winners error:', err);
+    res.status(500).json({ error: 'Failed to fetch winners.' });
+  }
+});
+
+// GET /api/external/health - Test authentication and API health
+app.get('/api/external/health', requireApiAuth, async (req, res) => {
+  try {
+    res.json({
+      status: 'ok',
+      message: 'API is healthy and credentials are valid.',
+      credential: {
+        name: req.apiCredential.name,
+        username: req.apiCredential.username
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Health check failed.' });
+  }
+});
+
+// GET /api/external/stats - Get summary statistics
+app.get('/api/external/stats', requireApiAuth, async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments({ accountStatus: 'approved', role: { $nin: ['admin', 'organizer'] } });
+    const totalEvents = await Event.countDocuments();
+    const upcomingEvents = await Event.countDocuments({ status: 'upcoming' });
+    const completedEvents = await Event.countDocuments({ status: 'completed' });
+    const totalRegistrations = await Registration.countDocuments();
+    const departments = await User.distinct('department', { accountStatus: 'approved', role: { $nin: ['admin', 'organizer'] } });
+
+    res.json({
+      users: totalUsers,
+      events: {
+        total: totalEvents,
+        upcoming: upcomingEvents,
+        completed: completedEvents
+      },
+      totalRegistrations,
+      departments: departments.filter(Boolean).sort()
+    });
+  } catch (err) {
+    console.error('External API - stats error:', err);
+    res.status(500).json({ error: 'Failed to fetch stats.' });
+  }
 });
 
 // ==================== STATIC FILES & SPA FALLBACK ====================

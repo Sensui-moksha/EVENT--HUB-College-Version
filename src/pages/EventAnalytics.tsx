@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useReducedMotion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
@@ -93,6 +94,7 @@ interface EventAnalytics {
     department: string;
   }>;
   recentRegistrations: Array<{
+    userId: string;
     eventTitle: string;
     userName: string;
     registeredAt: string;
@@ -105,6 +107,7 @@ interface EventAnalytics {
 const EventAnalytics: React.FC = () => {
   const { user } = useAuth();
   const { addToast } = useToast();
+  const navigate = useNavigate();
   
   // Stable user ID to prevent unnecessary re-renders
   const userId = user?._id || user?.id;
@@ -979,7 +982,8 @@ const EventAnalytics: React.FC = () => {
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: Math.min(index * 0.02, 0.3) }}
-                          className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                          onClick={() => reg.userId && navigate(`/user/${reg.userId}`)}
+                          className={`flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer ${
                             reg.status === 'attended'
                               ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 hover:border-green-300 hover:shadow-md'
                               : 'bg-gradient-to-r from-gray-50 to-white border-gray-100 hover:border-emerald-200 hover:shadow-md'

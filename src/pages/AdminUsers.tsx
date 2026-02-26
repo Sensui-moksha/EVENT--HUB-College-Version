@@ -24,7 +24,13 @@ import {
   AlertTriangle,
   CheckCircle,
   Eye,
-  ChevronRight
+  ChevronRight,
+  Key,
+  Plus,
+  Power,
+  Copy,
+  EyeOff,
+  Shield
 } from 'lucide-react';
 
 interface User {
@@ -98,7 +104,7 @@ const AdminUsers: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   
   // Tab state for My College / Other Colleges
-  const [activeTab, setActiveTab] = useState<'myCollege' | 'otherColleges' | 'promotions'>('myCollege');
+  const [activeTab, setActiveTab] = useState<'myCollege' | 'otherColleges' | 'promotions' | 'mentorsApi'>('myCollege');
   
   // Bulk delete state for other colleges
   const [selectedOtherCollegeUsers, setSelectedOtherCollegeUsers] = useState<string[]>([]);
@@ -107,6 +113,18 @@ const AdminUsers: React.FC = () => {
   // Promotion/demotion state
   const [promotionLoading, setPromotionLoading] = useState(false);
   const [promotionResults, setPromotionResults] = useState<{year: number; count: number}[]>([]);
+  
+  // Mentors API state
+  const [apiCredentials, setApiCredentials] = useState<Array<{
+    _id: string; name: string; username: string; isActive: boolean;
+    createdBy?: { name: string; email: string }; lastUsedAt?: string; createdAt: string;
+  }>>([]);
+  const [apiLoading, setApiLoading] = useState(false);
+  const [showApiForm, setShowApiForm] = useState(false);
+  const [apiForm, setApiForm] = useState({ name: '', username: '', password: '' });
+  const [showApiPassword, setShowApiPassword] = useState<Record<string, boolean>>({});
+  const [editApiPassword, setEditApiPassword] = useState<Record<string, string>>({});
+  const [showApiDoc, setShowApiDoc] = useState(false);
   
   // Selected year to view student list
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
@@ -209,6 +227,105 @@ const AdminUsers: React.FC = () => {
       }
     } catch (_error) {
       console.error('Failed to fetch pending users');
+    }
+  };
+
+  // Fetch API credentials
+  const fetchApiCredentials = async () => {
+    try {
+      setApiLoading(true);
+      const response = await fetch('/api/admin/api-credentials');
+      if (response.ok) {
+        const data = await response.json();
+        setApiCredentials(data);
+      }
+    } catch (_error) {
+      console.error('Failed to fetch API credentials');
+    } finally {
+      setApiLoading(false);
+    }
+  };
+
+  // Create API credential
+  const createApiCredential = async () => {
+    if (!apiForm.name || !apiForm.username || !apiForm.password) {
+      showToast('All fields are required', 'error');
+      return;
+    }
+    if (apiForm.password.length < 8) {
+      showToast('Password must be at least 8 characters', 'error');
+      return;
+    }
+    try {
+      const response = await fetch('/api/admin/api-credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(apiForm)
+      });
+      const data = await response.json();
+      if (response.ok) {
+        showToast('API credential created successfully', 'success');
+        setShowApiForm(false);
+        setApiForm({ name: '', username: '', password: '' });
+        fetchApiCredentials();
+      } else {
+        showToast(data.error || 'Failed to create credential', 'error');
+      }
+    } catch (_error) {
+      showToast('Failed to create credential', 'error');
+    }
+  };
+
+  // Toggle API credential active status
+  const toggleApiCredential = async (id: string, isActive: boolean) => {
+    try {
+      const response = await fetch(`/api/admin/api-credentials/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !isActive })
+      });
+      if (response.ok) {
+        showToast(`Credential ${isActive ? 'disabled' : 'enabled'}`, 'success');
+        fetchApiCredentials();
+      }
+    } catch (_error) {
+      showToast('Failed to update credential', 'error');
+    }
+  };
+
+  // Update API credential password
+  const updateApiPassword = async (id: string) => {
+    const newPassword = editApiPassword[id];
+    if (!newPassword || newPassword.length < 8) {
+      showToast('Password must be at least 8 characters', 'error');
+      return;
+    }
+    try {
+      const response = await fetch(`/api/admin/api-credentials/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newPassword })
+      });
+      if (response.ok) {
+        showToast('Password updated', 'success');
+        setEditApiPassword(prev => { const n = { ...prev }; delete n[id]; return n; });
+      }
+    } catch (_error) {
+      showToast('Failed to update password', 'error');
+    }
+  };
+
+  // Delete API credential
+  const deleteApiCredential = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this API credential?')) return;
+    try {
+      const response = await fetch(`/api/admin/api-credentials/${id}`, { method: 'DELETE' });
+      if (response.ok) {
+        showToast('Credential deleted', 'success');
+        fetchApiCredentials();
+      }
+    } catch (_error) {
+      showToast('Failed to delete credential', 'error');
     }
   };
 
@@ -376,6 +493,7 @@ const AdminUsers: React.FC = () => {
     fetchUsers();
     fetchAdminSettings();
     fetchPendingUsers();
+    fetchApiCredentials();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -960,6 +1078,18 @@ const AdminUsers: React.FC = () => {
               <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
               <span className="hidden sm:inline">Promotions</span>
               <span className="sm:hidden">Promote</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('mentorsApi')}
+              className={`flex-shrink-0 flex items-center justify-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-sm font-medium rounded-md transition-all whitespace-nowrap ${
+                activeTab === 'mentorsApi'
+                  ? 'bg-white text-orange-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <Key className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Mentors API</span>
+              <span className="sm:hidden">API</span>
             </button>
           </div>
         </div>
@@ -1593,6 +1723,279 @@ const AdminUsers: React.FC = () => {
             </div>
           )}
         </div>
+        )}
+
+        {/* Mentors API Tab */}
+        {activeTab === 'mentorsApi' && (
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl">
+                    <Shield className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">External API Credentials</h3>
+                    <p className="text-sm text-gray-500">Manage read-only API access for mentors and external systems</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowApiDoc(!showApiDoc)}
+                    className="px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+                  >
+                    <Eye className="w-4 h-4" />
+                    {showApiDoc ? 'Hide' : 'Show'} Docs
+                  </button>
+                  <button
+                    onClick={() => setShowApiForm(true)}
+                    className="px-4 py-2 text-sm font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    New Credential
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* API Documentation */}
+            {showApiDoc && (
+              <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-4 sm:p-6 text-white">
+                <h4 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-orange-400" />
+                  API Documentation
+                </h4>
+                <div className="space-y-4 text-sm">
+                  <div>
+                    <h5 className="font-semibold text-orange-300 mb-1">Authentication</h5>
+                    <p className="text-gray-300 mb-2">All endpoints use HTTP Basic Authentication. Include credentials in the Authorization header.</p>
+                    <div className="bg-black/30 rounded-lg p-3 font-mono text-xs overflow-x-auto">
+                      <span className="text-green-400">Authorization:</span> Basic {"<base64(username:password)>"}
+                    </div>
+                  </div>
+                  <div>
+                    <h5 className="font-semibold text-orange-300 mb-1">Base URL</h5>
+                    <div className="bg-black/30 rounded-lg p-3 font-mono text-xs flex items-center justify-between">
+                      <span>{window.location.origin}/api/external</span>
+                      <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/external`); showToast('Copied!', 'success'); }} className="text-orange-400 hover:text-orange-300 ml-2">
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <h5 className="font-semibold text-orange-300 mb-1">Endpoints</h5>
+                    <div className="space-y-2">
+                      {[
+                        { method: 'GET', path: '/users', desc: 'List all users (paginated). Query: ?department=&year=&search=&page=1&limit=50' },
+                        { method: 'GET', path: '/users/:userId', desc: 'Full user data: events registered, attended, upcoming, prizes won' },
+                        { method: 'GET', path: '/events', desc: 'List all events (paginated). Query: ?status=&category=&page=1&limit=50' },
+                        { method: 'GET', path: '/events/:eventId/registrations', desc: 'All registrations for a specific event' },
+                        { method: 'GET', path: '/events/:eventId/winners', desc: 'Winners/prizes for a specific event' },
+                      ].map((ep, i) => (
+                        <div key={i} className="bg-black/30 rounded-lg p-3 flex items-start gap-3">
+                          <span className="px-2 py-0.5 bg-green-600 text-white text-[10px] font-bold rounded flex-shrink-0">{ep.method}</span>
+                          <div>
+                            <code className="text-orange-200 text-xs">{ep.path}</code>
+                            <p className="text-gray-400 text-xs mt-0.5">{ep.desc}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <h5 className="font-semibold text-orange-300 mb-1">Example (JavaScript/fetch)</h5>
+                    <div className="bg-black/30 rounded-lg p-3 font-mono text-xs overflow-x-auto whitespace-pre">
+{`const headers = {
+  'Authorization': 'Basic ' + btoa('username:password')
+};
+
+// Get all users
+const res = await fetch('${window.location.origin}/api/external/users', { headers });
+const data = await res.json();
+
+// Get specific user with events & prizes
+const user = await fetch('${window.location.origin}/api/external/users/<userId>', { headers });
+const userData = await user.json();
+// userData = { user, stats, registeredEvents, attendedEvents, upcomingEvents, prizes, subEventPrizes }`}
+                    </div>
+                  </div>
+                  <div>
+                    <h5 className="font-semibold text-orange-300 mb-1">Example (Python)</h5>
+                    <div className="bg-black/30 rounded-lg p-3 font-mono text-xs overflow-x-auto whitespace-pre">
+{`import requests
+from requests.auth import HTTPBasicAuth
+
+auth = HTTPBasicAuth('username', 'password')
+base = '${window.location.origin}/api/external'
+
+# List users
+users = requests.get(f'{base}/users', auth=auth).json()
+
+# Get user detail with prizes
+user = requests.get(f'{base}/users/<userId>', auth=auth).json()
+print(user['stats'])  # { totalRegistered, totalAttended, totalUpcoming, totalPrizes }`}
+                    </div>
+                  </div>
+                  <div>
+                    <h5 className="font-semibold text-orange-300 mb-1">Example (cURL)</h5>
+                    <div className="bg-black/30 rounded-lg p-3 font-mono text-xs overflow-x-auto whitespace-pre">
+{`curl -u "username:password" ${window.location.origin}/api/external/users
+curl -u "username:password" ${window.location.origin}/api/external/users/<userId>`}
+                    </div>
+                  </div>
+                  <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                    <p className="text-yellow-300 text-xs"><strong>Note:</strong> This API is read-only. All data modifications must be done through the main application. Rate limiting applies.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Create Credential Form */}
+            {showApiForm && (
+              <div className="bg-white rounded-xl border border-orange-200 p-4 sm:p-6">
+                <h4 className="text-base font-semibold text-gray-900 mb-4">Create New API Credential</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Mentor Dashboard"
+                      value={apiForm.name}
+                      onChange={(e) => setApiForm({ ...apiForm, name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. mentor_api"
+                      value={apiForm.username}
+                      onChange={(e) => setApiForm({ ...apiForm, username: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Password (min 8 chars)</label>
+                    <input
+                      type="text"
+                      placeholder="Strong password"
+                      value={apiForm.password}
+                      onChange={(e) => setApiForm({ ...apiForm, password: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-4">
+                  <button
+                    onClick={createApiCredential}
+                    className="px-4 py-2 bg-orange-500 text-white text-sm rounded-lg hover:bg-orange-600 transition-colors"
+                  >
+                    Create
+                  </button>
+                  <button
+                    onClick={() => { setShowApiForm(false); setApiForm({ name: '', username: '', password: '' }); }}
+                    className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Credentials List */}
+            {apiLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin h-8 w-8 border-4 border-orange-500 border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-500 text-sm mt-3">Loading credentials...</p>
+              </div>
+            ) : apiCredentials.length > 0 ? (
+              <div className="space-y-4">
+                {apiCredentials.map((cred) => (
+                  <div key={cred._id} className={`bg-white rounded-xl border p-4 sm:p-5 transition-all ${cred.isActive ? 'border-green-200' : 'border-red-200 opacity-60'}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${cred.isActive ? 'bg-green-100' : 'bg-red-100'}`}>
+                          <Key className={`w-4 h-4 ${cred.isActive ? 'text-green-600' : 'text-red-600'}`} />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900">{cred.name}</h4>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-sm text-gray-500 font-mono">{cred.username}</span>
+                            <button onClick={() => { navigator.clipboard.writeText(cred.username); showToast('Username copied', 'success'); }} className="text-gray-400 hover:text-gray-600">
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center px-2 py-1 text-xs rounded-full ${cred.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                          <Power className="w-3 h-3 mr-1" />
+                          {cred.isActive ? 'Active' : 'Disabled'}
+                        </span>
+                        <button
+                          onClick={() => toggleApiCredential(cred._id, cred.isActive)}
+                          className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${cred.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                        >
+                          {cred.isActive ? 'Disable' : 'Enable'}
+                        </button>
+                        <button
+                          onClick={() => deleteApiCredential(cred._id)}
+                          className="px-3 py-1.5 text-xs bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-500">
+                      {cred.createdBy && <span>Created by: {cred.createdBy.name}</span>}
+                      <span>Created: {new Date(cred.createdAt).toLocaleDateString()}</span>
+                      {cred.lastUsedAt && <span>Last used: {new Date(cred.lastUsedAt).toLocaleString()}</span>}
+                    </div>
+                    {/* Password change section */}
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type={showApiPassword[cred._id] ? 'text' : 'password'}
+                          placeholder="New password (min 8 chars)"
+                          value={editApiPassword[cred._id] || ''}
+                          onChange={(e) => setEditApiPassword(prev => ({ ...prev, [cred._id]: e.target.value }))}
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                        />
+                        <button
+                          onClick={() => setShowApiPassword(prev => ({ ...prev, [cred._id]: !prev[cred._id] }))}
+                          className="p-1.5 text-gray-400 hover:text-gray-600"
+                        >
+                          {showApiPassword[cred._id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                        {editApiPassword[cred._id] && (
+                          <button
+                            onClick={() => updateApiPassword(cred._id)}
+                            className="px-3 py-1.5 text-xs bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                          >
+                            Update Password
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+                <Key className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <h4 className="text-lg font-semibold text-gray-900 mb-1">No API Credentials</h4>
+                <p className="text-sm text-gray-500 mb-4">Create credentials to allow external systems to access the read-only API.</p>
+                <button
+                  onClick={() => setShowApiForm(true)}
+                  className="px-4 py-2 bg-orange-500 text-white text-sm rounded-lg hover:bg-orange-600 transition-colors"
+                >
+                  Create First Credential
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Create User Modal */}
