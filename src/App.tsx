@@ -40,6 +40,7 @@ import Gallery from './pages/Gallery';
 import GalleryDetail from './pages/GalleryDetail';
 import GalleryManager from './pages/GalleryManager';
 import JoinTeam from './pages/JoinTeam';
+import ExternalAPI from './pages/ExternalAPI';
 
 // Simple error boundary
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: any }> {
@@ -314,6 +315,11 @@ function AnimatedRoutes() {
               <QRScannerPage />
             </ErrorBoundary>
           </ProtectedRoute>
+        } />
+        <Route path="/external-api" element={
+          <ErrorBoundary>
+            <ExternalAPI />
+          </ErrorBoundary>
         } />
       </Routes>
     </AnimatePresence>

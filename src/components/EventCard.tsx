@@ -14,10 +14,11 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { Event } from '../types';
-import { useEvents } from '../contexts/EventContext';
+
 import { cardHoverVariants } from '../utils/animations';
 import { displayCategoryLabel, getCategoryColor as getCategoryColorUtil } from '../utils/categories';
 import { useAuth } from '../contexts/AuthContext';
+import { useEvents } from '../contexts/EventContext';
 import { API_BASE_URL } from '../utils/api';
 
 interface EventCardProps {
@@ -167,15 +168,9 @@ const EventCard: React.FC<EventCardProps> = ({ event }) => {
     }
   };
 
-  // Use registrations from context as a more authoritative source for current participant count
-  const { registrations } = useEvents();
-  const backendEventId = (event as any)._id || event.id;
-  const countedParticipants = registrations
-    ? registrations.filter((r: any) => String(r.eventId) === String(backendEventId) && r.approvalStatus === 'approved').length
-    : 0;
-
-  // Prefer the counted value when available (i.e., registrations loaded). Fallback to event.currentParticipants.
-  const displayedParticipants = countedParticipants > 0 ? countedParticipants : (event.currentParticipants || 0);
+  // Use event.currentParticipants directly - the server now returns accurate counts
+  // computed from the Registration collection, so no need to recount from context
+  const displayedParticipants = event.currentParticipants || 0;
   const displayedProgress = event.maxParticipants ? Math.round((displayedParticipants / event.maxParticipants) * 100) : 0;
   const displayedProgressWidth = event.maxParticipants ? Math.min((displayedParticipants / event.maxParticipants) * 100, 100) : 0;
 

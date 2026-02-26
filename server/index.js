@@ -5317,6 +5317,27 @@ app.get('/api/events', routeCache.events, async (req, res) => {
   try {
     const events = await Event.find().lean();
     
+    // Compute accurate participant counts from Registration collection
+    const eventIds = events.map(e => e._id);
+    const regCounts = await Registration.aggregate([
+      { $match: { eventId: { $in: eventIds }, approvalStatus: 'approved' } },
+      { $group: { _id: '$eventId', count: { $sum: 1 } } }
+    ]);
+    const regCountMap = {};
+    regCounts.forEach(r => { regCountMap[r._id.toString()] = r.count; });
+    
+    // Sync currentParticipants in DB if drifted (fire-and-forget, non-blocking)
+    const updates = [];
+    events.forEach(event => {
+      const actualCount = regCountMap[event._id.toString()] || 0;
+      if (event.currentParticipants !== actualCount) {
+        updates.push(Event.updateOne({ _id: event._id }, { $set: { currentParticipants: actualCount } }));
+      }
+    });
+    if (updates.length > 0) {
+      Promise.all(updates).catch(err => console.error('Error syncing participant counts:', err));
+    }
+    
     // Manually attach organizer info (organizerId is String, not ObjectId ref)
     const organizerIds = [...new Set(events.map(e => e.organizerId).filter(Boolean))];
     const organizers = await User.find({ _id: { $in: organizerIds } }, 'name email role department').lean();
@@ -5325,7 +5346,9 @@ app.get('/api/events', routeCache.events, async (req, res) => {
     
     const enrichedEvents = events.map(event => {
       const organizer = event.organizerId ? organizerMap[event.organizerId] : null;
-      return { ...event, organizer: organizer || null };
+      // Use the accurate count from registrations
+      const actualCount = regCountMap[event._id.toString()] || 0;
+      return { ...event, currentParticipants: actualCount, organizer: organizer || null };
     });
     
     res.json(enrichedEvents);
@@ -5342,6 +5365,14 @@ app.get('/api/events/:id', routeCache.eventDetail, async (req, res) => {
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
     }
+    
+    // Compute accurate participant count from Registration collection
+    const actualCount = await Registration.countDocuments({ eventId: event._id, approvalStatus: 'approved' });
+    if (event.currentParticipants !== actualCount) {
+      // Sync DB in background (fire-and-forget)
+      Event.updateOne({ _id: event._id }, { $set: { currentParticipants: actualCount } }).catch(() => {});
+    }
+    event.currentParticipants = actualCount;
     
     // Manually attach organizer info (organizerId is String, not ObjectId ref)
     if (event.organizerId) {
@@ -12643,6 +12674,26 @@ app.get('/api/external/events/:eventId/winners', requireApiAuth, async (req, res
     console.error('External API - event winners error:', err);
     res.status(500).json({ error: 'Failed to fetch winners.' });
   }
+});
+
+// GET /api/external - API info and endpoint directory (no auth required)
+app.get('/api/external', (req, res) => {
+  res.json({
+    name: 'EventHub Mentors API',
+    version: '1.0',
+    description: 'Read-only API for external applications to access student data, events, registrations, and prizes.',
+    authentication: 'HTTP Basic Auth - credentials managed by admin in the API Credentials panel.',
+    endpoints: [
+      { method: 'GET', path: '/api/external/health', auth: true, description: 'Test credentials and check API health' },
+      { method: 'GET', path: '/api/external/stats', auth: true, description: 'Summary statistics (users, events, departments)' },
+      { method: 'GET', path: '/api/external/users', auth: true, description: 'List students (paginated). Query: ?department=&year=&search=&page=1&limit=50' },
+      { method: 'GET', path: '/api/external/users/:userId', auth: true, description: 'Student detail with events, attendance, and prizes' },
+      { method: 'GET', path: '/api/external/events', auth: true, description: 'List events (paginated). Query: ?status=&category=&page=1&limit=50' },
+      { method: 'GET', path: '/api/external/events/:eventId/registrations', auth: true, description: 'Event registrations (excludes admin/organizer)' },
+      { method: 'GET', path: '/api/external/events/:eventId/winners', auth: true, description: 'Event winners and prizes (excludes admin/organizer)' }
+    ],
+    notes: 'Admin and organizer accounts are excluded from all user responses. This API is read-only.'
+  });
 });
 
 // GET /api/external/health - Test authentication and API health

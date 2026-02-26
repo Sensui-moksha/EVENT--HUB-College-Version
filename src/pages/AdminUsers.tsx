@@ -1787,11 +1787,13 @@ const AdminUsers: React.FC = () => {
                     <h5 className="font-semibold text-orange-300 mb-1">Endpoints</h5>
                     <div className="space-y-2">
                       {[
-                        { method: 'GET', path: '/users', desc: 'List all users (paginated). Query: ?department=&year=&search=&page=1&limit=50' },
+                        { method: 'GET', path: '/health', desc: 'Test API credentials and check health' },
+                        { method: 'GET', path: '/stats', desc: 'Summary statistics: users, events, departments' },
+                        { method: 'GET', path: '/users', desc: 'List all students (paginated). Query: ?department=&year=&search=&page=1&limit=50' },
                         { method: 'GET', path: '/users/:userId', desc: 'Full user data: events registered, attended, upcoming, prizes won' },
                         { method: 'GET', path: '/events', desc: 'List all events (paginated). Query: ?status=&category=&page=1&limit=50' },
-                        { method: 'GET', path: '/events/:eventId/registrations', desc: 'All registrations for a specific event' },
-                        { method: 'GET', path: '/events/:eventId/winners', desc: 'Winners/prizes for a specific event' },
+                        { method: 'GET', path: '/events/:eventId/registrations', desc: 'All registrations for a specific event (excludes admin/organizer)' },
+                        { method: 'GET', path: '/events/:eventId/winners', desc: 'Winners/prizes for a specific event (excludes admin/organizer)' },
                       ].map((ep, i) => (
                         <div key={i} className="bg-black/30 rounded-lg p-3 flex items-start gap-3">
                           <span className="px-2 py-0.5 bg-green-600 text-white text-[10px] font-bold rounded flex-shrink-0">{ep.method}</span>
@@ -1845,7 +1847,10 @@ curl -u "username:password" ${window.location.origin}/api/external/users/<userId
                     </div>
                   </div>
                   <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                    <p className="text-yellow-300 text-xs"><strong>Note:</strong> This API is read-only. All data modifications must be done through the main application. Rate limiting applies.</p>
+                    <p className="text-yellow-300 text-xs"><strong>Note:</strong> This API is read-only. Admin and organizer accounts are excluded from all responses. All data modifications must be done through the main application.</p>
+                  </div>
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                    <p className="text-blue-300 text-xs"><strong>API Explorer:</strong> You can test the API interactively at <a href="/external-api" target="_blank" rel="noopener noreferrer" className="underline text-blue-400 hover:text-blue-300">/external-api</a></p>
                   </div>
                 </div>
               </div>
