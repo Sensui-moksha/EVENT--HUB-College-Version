@@ -1151,14 +1151,11 @@ export async function exportSingleEventAnalyticsToExcel(
     }
   }
 
-  // Add summary row
+  // Add summary rows
   if (analytics.recentRegistrations.length > 0) {
     const attendedCount = analytics.recentRegistrations.filter(r => r.status === 'attended').length;
     addSummaryRow(recentSheet, 4 + analytics.recentRegistrations.length + 1, 'Total Registrations:', analytics.recentRegistrations.length, 4);
-    const attendedSummaryRow = 4 + analytics.recentRegistrations.length + 2;
-    recentSheet.getRow(attendedSummaryRow).values = ['', '', 'Total Attended:', attendedCount];
-    recentSheet.getRow(attendedSummaryRow).getCell(3).font = { ...FONTS.header, size: 11 };
-    recentSheet.getRow(attendedSummaryRow).getCell(4).font = { ...FONTS.header, size: 11, color: { argb: COLORS.successText } };
+    addSummaryRow(recentSheet, 4 + analytics.recentRegistrations.length + 2, 'Total Attended:', attendedCount, 4);
   }
 
   recentSheet.columns = [{ width: 8 }, { width: 30 }, { width: 25 }, { width: 15 }];
