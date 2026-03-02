@@ -866,7 +866,7 @@ const AdminUsers: React.FC = () => {
         </div>
 
         {/* Registration Approval Settings */}
-        <div className="mb-4 sm:mb-6 bg-white shadow rounded-lg p-3 sm:p-4 md:p-6">
+        <div className="mb-4 sm:mb-6 bg-white shadow-lg shadow-gray-200/80 rounded-lg p-3 sm:p-4 md:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h2 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900">Registration Approval</h2>
@@ -1149,7 +1149,7 @@ const AdminUsers: React.FC = () => {
         {activeTab === 'promotions' && (
           <div className="space-y-4 sm:space-y-6">
             {/* Header */}
-            <div className="bg-white shadow rounded-lg p-3 sm:p-6">
+            <div className="bg-white shadow-lg shadow-gray-200/80 rounded-lg p-3 sm:p-6">
               <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 mb-3 sm:mb-4">
                 <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg flex-shrink-0">
                   <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
@@ -1368,7 +1368,7 @@ const AdminUsers: React.FC = () => {
 
         {/* Users Table - My College */}
         {activeTab === 'myCollege' && (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-white shadow-lg shadow-gray-200/80 rounded-lg overflow-hidden">
           {/* Mobile Card View */}
           <div className="sm:hidden divide-y divide-gray-200">
             {myCollegeUsers.map((userData) => (
@@ -1571,7 +1571,7 @@ const AdminUsers: React.FC = () => {
 
         {/* Users Table - Other Colleges */}
         {activeTab === 'otherColleges' && (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-white shadow-lg shadow-gray-200/80 rounded-lg overflow-hidden">
           {/* Mobile Card View */}
           <div className="sm:hidden divide-y divide-gray-200">
             {otherCollegeUsers.map((userData) => (

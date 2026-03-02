@@ -1803,7 +1803,7 @@ const EventDetails: React.FC = () => {
           <span>Back to Events</span>
         </motion.button>
 
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-xl shadow-gray-200/70 border border-gray-200 overflow-hidden">
           {/* Event Image */}
           {event.image && (
             <div className="relative">
@@ -2072,7 +2072,7 @@ const EventDetails: React.FC = () => {
                       key={invitation._id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm"
+                      className="bg-white rounded-lg p-4 border border-blue-100 shadow-md shadow-blue-100/50"
                     >
                       {/* Team Name & Leader */}
                       <div className="flex items-start justify-between mb-3">
@@ -3644,7 +3644,7 @@ const EventDetails: React.FC = () => {
             transition={{ delay: 0.35 }}
             className="mt-6 sm:mt-8"
           >
-            <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 border border-gray-200">
+            <div className="bg-white rounded-lg shadow-xl shadow-gray-200/70 p-4 sm:p-6 border border-gray-200">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 sm:mb-4 gap-3">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                   <div className="w-8 h-8 sm:w-10 sm:h-10 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">

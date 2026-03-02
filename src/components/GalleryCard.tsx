@@ -66,7 +66,7 @@ const GalleryCard: React.FC<GalleryCardProps> = ({ event, gallery, onClick, inde
       <div className={`absolute -inset-1 bg-gradient-to-r ${isUnpublished ? 'from-amber-600 to-orange-600' : 'from-violet-600 to-fuchsia-600'} rounded-2xl opacity-0 group-hover:opacity-50 blur-xl transition-all duration-500`}></div>
       
       {/* Main card */}
-      <div className="relative bg-white/10 backdrop-blur-xl rounded-2xl overflow-hidden border border-white/20 shadow-xl group-hover:border-white/40 transition-all duration-500">
+      <div className="relative bg-white/10 backdrop-blur-xl rounded-2xl overflow-hidden border border-white/20 shadow-2xl shadow-black/20 group-hover:border-white/40 group-hover:shadow-purple-500/30 transition-all duration-500">
         {/* Cover image */}
         <div className="relative w-full h-52 overflow-hidden">
           {coverImage ? (

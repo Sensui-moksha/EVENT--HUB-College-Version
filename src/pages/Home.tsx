@@ -127,7 +127,7 @@ const Home: React.FC = () => {
         tabIndex={isClickable ? 0 : undefined}
         onClick={isClickable ? navigateToEvents : undefined}
         onKeyDown={isClickable ? handleEventsKeyDown : undefined}
-        className={`text-center p-4 sm:p-6 lg:p-8 rounded-xl bg-gradient-to-br from-gray-50 to-white border border-gray-100 hover:shadow-lg transition-all duration-300 ${isClickable ? 'cursor-pointer' : ''}`}
+        className={`text-center p-4 sm:p-6 lg:p-8 rounded-xl bg-gradient-to-br from-gray-50 to-white border border-gray-200 shadow-md hover:shadow-xl transition-all duration-300 ${isClickable ? 'cursor-pointer' : ''}`}
       >
         <div className={`inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-lg ${stat.bgColor} mb-3 sm:mb-4`}>
           <stat.icon className={`w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 ${stat.color}`} />

@@ -224,7 +224,7 @@ const UserProfile: React.FC = () => {
 
         {/* Profile Header */}
         <motion.div 
-          className="bg-white rounded-2xl shadow-lg p-6 md:p-8 mb-6"
+          className="bg-white rounded-2xl shadow-xl shadow-gray-200/70 p-6 md:p-8 mb-6"
           variants={fadeInVariants}
           initial="hidden"
           animate="visible"
@@ -279,7 +279,7 @@ const UserProfile: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           {/* Academic/Professional Details */}
           <motion.div 
-            className="bg-white rounded-2xl shadow-lg p-6"
+            className="bg-white rounded-2xl shadow-xl shadow-gray-200/70 p-6"
             variants={fadeInVariants}
             initial="hidden"
             animate="visible"
@@ -347,7 +347,7 @@ const UserProfile: React.FC = () => {
           {/* Statistics */}
           {canShowField('statistics') ? (
             <motion.div 
-              className="bg-white rounded-2xl shadow-lg p-6"
+              className="bg-white rounded-2xl shadow-xl shadow-gray-200/70 p-6"
               variants={fadeInVariants}
               initial="hidden"
               animate="visible"
@@ -392,7 +392,7 @@ const UserProfile: React.FC = () => {
           </motion.div>
           ) : (
             <motion.div 
-              className="bg-white rounded-2xl shadow-lg p-6"
+              className="bg-white rounded-2xl shadow-xl shadow-gray-200/70 p-6"
               variants={fadeInVariants}
               initial="hidden"
               animate="visible"
@@ -407,25 +407,27 @@ const UserProfile: React.FC = () => {
         {/* Events Section with Tabs */}
         {userEvents.length > 0 && (
           <motion.div 
-            className="bg-white rounded-2xl shadow-lg p-6"
+            className="bg-white rounded-2xl shadow-xl shadow-gray-200/70 p-3 sm:p-6"
             variants={fadeInVariants}
             initial="hidden"
             animate="visible"
             transition={{ delay: 0.3 }}
           >
             {/* Tab Header */}
-            <div className="flex items-center gap-1 mb-5 border-b border-gray-200">
+            <div className="flex items-center gap-0.5 sm:gap-1 mb-4 sm:mb-5 border-b border-gray-200 overflow-x-auto scrollbar-hide">
               <button
                 onClick={() => setEventsTab('registered')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors whitespace-nowrap min-w-0 ${
                   eventsTab === 'registered'
                     ? 'border-blue-600 text-blue-700'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                <Users className="w-4 h-4" />
-                Registered Events
-                <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="hidden xs:inline">Registered</span>
+                <span className="xs:hidden">Reg.</span>
+                <span className="hidden sm:inline">&nbsp;Events</span>
+                <span className={`ml-0.5 sm:ml-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold ${
                   eventsTab === 'registered' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'
                 }`}>
                   {userEvents.length}
@@ -433,15 +435,15 @@ const UserProfile: React.FC = () => {
               </button>
               <button
                 onClick={() => setEventsTab('attended')}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors whitespace-nowrap min-w-0 ${
                   eventsTab === 'attended'
                     ? 'border-emerald-600 text-emerald-700'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                <CheckCircle className="w-4 h-4" />
+                <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
                 Attended
-                <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+                <span className={`ml-0.5 sm:ml-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold ${
                   eventsTab === 'attended' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
                 }`}>
                   {userEvents.filter((e: any) => e.registration?.status === 'attended').length}
@@ -457,12 +459,12 @@ const UserProfile: React.FC = () => {
 
               if (displayEvents.length === 0) {
                 return (
-                  <div className="text-center py-10">
-                    <CheckCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500 font-medium">
+                  <div className="text-center py-6 sm:py-10">
+                    <CheckCircle className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2 sm:mb-3" />
+                    <p className="text-gray-500 font-medium text-sm sm:text-base">
                       {eventsTab === 'attended' ? 'No attended events yet' : 'No registered events'}
                     </p>
-                    <p className="text-gray-400 text-sm mt-1">
+                    <p className="text-gray-400 text-xs sm:text-sm mt-1">
                       {eventsTab === 'attended' ? 'Attendance will appear here once marked.' : 'No events found.'}
                     </p>
                   </div>
@@ -470,7 +472,7 @@ const UserProfile: React.FC = () => {
               }
 
               return (
-                <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                <div className="space-y-2 sm:space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto">
                   {displayEvents.map((event: any, index: number) => {
                 const registration = event.registration;
                 const approvalStatus = registration?.approvalStatus || 'approved';
@@ -479,45 +481,50 @@ const UserProfile: React.FC = () => {
                 return (
                   <div 
                     key={index}
-                    className="flex items-center gap-4 p-4 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+                    className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 p-3 sm:p-4 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
                     onClick={() => navigate(`/events/${event.id || event._id}`)}
                   >
-                    {event.image && (
-                      <img 
-                        src={event.image} 
-                        alt={event.title}
-                        className="w-16 h-16 object-cover rounded-lg"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{event.title}</h3>
-                      <p className="text-sm text-gray-600">{new Date(event.date).toLocaleDateString()}</p>
-                      
-                      {/* Approval Status Badge */}
-                      {approvalStatus === 'pending' && (
-                        <div className="flex items-center gap-1.5 mt-2">
-                          <Clock className="w-4 h-4 text-yellow-600" />
-                          <span className="text-xs font-medium text-yellow-700">
-                            Pending Approval
-                          </span>
-                        </div>
+                    {/* Image + Title row on mobile */}
+                    <div className="flex items-center gap-3 sm:contents">
+                      {event.image && (
+                        <img 
+                          src={event.image} 
+                          alt={event.title}
+                          className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-lg flex-shrink-0"
+                        />
                       )}
-                      {approvalStatus === 'rejected' && (
-                        <div className="flex items-center gap-1.5 mt-2">
-                          <XCircle className="w-4 h-4 text-red-600" />
-                          <span className="text-xs font-medium text-red-700">
-                            Registration Rejected
-                          </span>
-                          {registration?.rejectionReason && (
-                            <span className="text-xs text-red-600">
-                              - {registration.rejectionReason}
+                      <div className="flex-1 min-w-0 sm:flex-1">
+                        <h3 className="font-semibold text-gray-900 text-sm sm:text-base truncate">{event.title}</h3>
+                        <p className="text-xs sm:text-sm text-gray-600">{new Date(event.date).toLocaleDateString()}</p>
+                        
+                        {/* Approval Status Badge - inline on mobile */}
+                        {approvalStatus === 'pending' && (
+                          <div className="flex items-center gap-1.5 mt-1 sm:mt-2">
+                            <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-600" />
+                            <span className="text-[10px] sm:text-xs font-medium text-yellow-700">
+                              Pending Approval
                             </span>
-                          )}
-                        </div>
-                      )}
+                          </div>
+                        )}
+                        {approvalStatus === 'rejected' && (
+                          <div className="flex items-center gap-1 sm:gap-1.5 mt-1 sm:mt-2 flex-wrap">
+                            <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-600" />
+                            <span className="text-[10px] sm:text-xs font-medium text-red-700">
+                              Registration Rejected
+                            </span>
+                            {registration?.rejectionReason && (
+                              <span className="text-[10px] sm:text-xs text-red-600">
+                                - {registration.rejectionReason}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    
+                    {/* Badges row */}
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 sm:flex-col sm:items-end pl-0 sm:pl-0">
+                      <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${
                         event.status === 'upcoming' ? 'bg-green-100 text-green-800' :
                         event.status === 'ongoing' ? 'bg-yellow-100 text-yellow-800' :
                         'bg-gray-100 text-gray-800'
@@ -527,25 +534,25 @@ const UserProfile: React.FC = () => {
                       
                       {/* Attendance Status Badge */}
                       {attendanceStatus === 'attended' && (
-                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3" />
+                        <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                          <CheckCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                           Attended
                         </span>
                       )}
 
                       {/* Approval Status Badge */}
                       {approvalStatus === 'pending' && (
-                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
+                        <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
                           Pending
                         </span>
                       )}
                       {approvalStatus === 'approved' && registration && attendanceStatus !== 'attended' && (
-                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-300">
+                        <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium bg-green-100 text-green-800 border border-green-300">
                           Approved
                         </span>
                       )}
                       {approvalStatus === 'rejected' && (
-                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
+                        <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium bg-red-100 text-red-800 border border-red-300">
                           Rejected
                         </span>
                       )}

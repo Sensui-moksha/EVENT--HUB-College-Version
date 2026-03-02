@@ -186,7 +186,7 @@ const Dashboard: React.FC = () => {
         <div className="mb-6 sm:mb-8">
           {/* Mobile Logo - Centered */}
           <div className="flex justify-center sm:hidden mb-4">
-            <div className="bg-white rounded-xl p-3 shadow-md border border-gray-200">
+            <div className="bg-white rounded-xl p-3 shadow-lg shadow-gray-200/80 border border-gray-200">
               <img 
                 src="/logo-small.png" 
                 alt="College Logo" 
@@ -209,7 +209,7 @@ const Dashboard: React.FC = () => {
             
             {/* Desktop Logo - Right Side */}
             <div className="hidden sm:flex items-center justify-center ml-6">
-              <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 hover:scale-105">
+              <div className="bg-white rounded-2xl p-4 shadow-xl shadow-gray-200/80 border border-gray-200 hover:shadow-2xl transition-all duration-300 hover:scale-105">
                 <img 
                   src="/logo-small.png" 
                   alt="College Logo" 
@@ -230,7 +230,7 @@ const Dashboard: React.FC = () => {
           {stats.map((stat, index) => (
             <motion.div
               key={index}
-              className="bg-white rounded-xl p-4 sm:p-6 shadow-md border border-gray-200 ring-1 ring-gray-100 hover:shadow-xl hover:ring-gray-200 transition-all"
+              className="bg-white rounded-xl p-4 sm:p-6 shadow-lg shadow-gray-200/80 border border-gray-200 ring-1 ring-gray-100 hover:shadow-xl hover:ring-gray-200 transition-all"
               variants={{
                 initial: { opacity: 0, y: 20 },
                 animate: { opacity: 1, y: 0 }
@@ -250,7 +250,7 @@ const Dashboard: React.FC = () => {
         </motion.div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 ring-1 ring-gray-100">
+        <div className="bg-white rounded-xl shadow-lg shadow-gray-200/80 border border-gray-200 ring-1 ring-gray-100">
           <div className="border-b border-gray-200">
             <nav className="flex overflow-x-auto px-4 sm:px-6">
               {tabs.map(tab => (
@@ -409,7 +409,7 @@ const Dashboard: React.FC = () => {
                       return (
                         <div 
                           key={event.id} 
-                          className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow relative cursor-pointer"
+                          className="border border-gray-200 rounded-lg p-6 shadow-md shadow-gray-100/80 hover:shadow-lg transition-shadow relative cursor-pointer"
                           onClick={() => navigate(`/events/${event.id}`)}
                           title="Click to view event details"
                         >
@@ -641,7 +641,7 @@ const Dashboard: React.FC = () => {
                       return (
                         <div 
                           key={registration.id} 
-                          className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer"
+                          className="border border-gray-200 rounded-lg p-6 shadow-md shadow-gray-100/80 hover:shadow-lg transition-shadow cursor-pointer"
                           onClick={() => {
                             if (eventId) {
                               navigate(`/events/${eventId}`);
