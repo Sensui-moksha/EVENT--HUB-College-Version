@@ -55,6 +55,8 @@ interface UserStats {
   upcomingEvents: number;
 }
 
+type EventsTab = 'registered' | 'attended';
+
 const UserProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
@@ -70,6 +72,7 @@ const UserProfile: React.FC = () => {
   });
   const [loading, setLoading] = useState(true);
   const [userEvents, setUserEvents] = useState<any[]>([]);
+  const [eventsTab, setEventsTab] = useState<EventsTab>('registered');
 
   useEffect(() => {
     if (userId) {
@@ -401,7 +404,7 @@ const UserProfile: React.FC = () => {
           )}
         </div>
 
-        {/* Recent Events */}
+        {/* Events Section with Tabs */}
         {userEvents.length > 0 && (
           <motion.div 
             className="bg-white rounded-2xl shadow-lg p-6"
@@ -410,9 +413,65 @@ const UserProfile: React.FC = () => {
             animate="visible"
             transition={{ delay: 0.3 }}
           >
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Registered Events ({userEvents.length})</h2>
-            <div className="space-y-3 max-h-[600px] overflow-y-auto">
-              {userEvents.map((event: any, index: number) => {
+            {/* Tab Header */}
+            <div className="flex items-center gap-1 mb-5 border-b border-gray-200">
+              <button
+                onClick={() => setEventsTab('registered')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                  eventsTab === 'registered'
+                    ? 'border-blue-600 text-blue-700'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                Registered Events
+                <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+                  eventsTab === 'registered' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'
+                }`}>
+                  {userEvents.length}
+                </span>
+              </button>
+              <button
+                onClick={() => setEventsTab('attended')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                  eventsTab === 'attended'
+                    ? 'border-emerald-600 text-emerald-700'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <CheckCircle className="w-4 h-4" />
+                Attended
+                <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+                  eventsTab === 'attended' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                }`}>
+                  {userEvents.filter((e: any) => e.registration?.status === 'attended').length}
+                </span>
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            {(() => {
+              const displayEvents = eventsTab === 'attended'
+                ? userEvents.filter((e: any) => e.registration?.status === 'attended')
+                : userEvents;
+
+              if (displayEvents.length === 0) {
+                return (
+                  <div className="text-center py-10">
+                    <CheckCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 font-medium">
+                      {eventsTab === 'attended' ? 'No attended events yet' : 'No registered events'}
+                    </p>
+                    <p className="text-gray-400 text-sm mt-1">
+                      {eventsTab === 'attended' ? 'Attendance will appear here once marked.' : 'No events found.'}
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                  {displayEvents.map((event: any, index: number) => {
                 const registration = event.registration;
                 const approvalStatus = registration?.approvalStatus || 'approved';
                 const attendanceStatus = registration?.status;
@@ -494,7 +553,9 @@ const UserProfile: React.FC = () => {
                   </div>
                 );
               })}
-            </div>
+                </div>
+              );
+            })()}
           </motion.div>
         )}
       </div>

@@ -3532,7 +3532,7 @@ const EventDetails: React.FC = () => {
                               <button
                                 onClick={() => handleToggleAttendance(reg)}
                                 disabled={markingAttended[regId]}
-                                className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center space-x-1"
+                                className="px-2 py-1 bg-green-600 text-white text-[10px] rounded hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center space-x-1"
                                 title="Click to undo attendance"
                               >
                                 <Trash2 className="w-3 h-3" />
