@@ -489,6 +489,7 @@ export async function exportAnalyticsToExcel(
     cancelledEvents: number;
     totalRegistrations: number;
     totalParticipants: number;
+    totalAttended?: number;
     averageRegistrationsPerEvent: number;
     categoryBreakdown: Array<{ category: string; count: number }>;
     topEvents: Array<{
@@ -497,12 +498,16 @@ export async function exportAnalyticsToExcel(
       capacity: number;
       status: string;
       date: string;
+      createdBy?: string;
+      department?: string;
     }>;
     recentRegistrations: Array<{
       eventTitle: string;
       userName: string;
       registeredAt: string;
       fromWaitlist: boolean;
+      status?: string;
+      approvalStatus?: string;
     }>;
   },
   filterLabel: string
@@ -557,9 +562,16 @@ export async function exportAnalyticsToExcel(
     fgColor: { argb: COLORS.titleBg },
   };
 
+  const allTotalAttended = analytics.totalAttended ?? analytics.recentRegistrations.filter(r => r.status === 'attended').length;
+  const approvalRate = analytics.totalRegistrations > 0 ? ((analytics.totalParticipants / analytics.totalRegistrations) * 100).toFixed(1) : '0.0';
+  const attendanceRate = analytics.totalParticipants > 0 ? ((allTotalAttended / analytics.totalParticipants) * 100).toFixed(1) : '0.0';
+  const completionRate = analytics.totalEvents > 0 ? ((analytics.completedEvents / analytics.totalEvents) * 100).toFixed(1) : '0.0';
+
   const regData = [
     ['Total Registrations', analytics.totalRegistrations, ''],
-    ['Confirmed Participants', analytics.totalParticipants, `${((analytics.totalParticipants / analytics.totalRegistrations) * 100 || 0).toFixed(1)}%`],
+    ['Approved Participants', analytics.totalParticipants, `${approvalRate}% of registrations`],
+    ['Total Attended', allTotalAttended, `${attendanceRate}% of approved`],
+    ['Not Attended', analytics.totalParticipants - allTotalAttended, ''],
     ['Avg. Registrations/Event', analytics.averageRegistrationsPerEvent.toFixed(2), ''],
   ];
 
@@ -571,7 +583,209 @@ export async function exportAnalyticsToExcel(
   });
   styleDataRows(overviewSheet, regStartRow + 2, regStartRow + 1 + regData.length, 3);
 
-  overviewSheet.columns = [{ width: 25 }, { width: 20 }, { width: 15 }];
+  // Key Rates Section
+  const ratesStartRow = regStartRow + regData.length + 3;
+  overviewSheet.getRow(ratesStartRow).values = ['📊 KEY RATES', '', ''];
+  overviewSheet.mergeCells(`A${ratesStartRow}:C${ratesStartRow}`);
+  overviewSheet.getRow(ratesStartRow).getCell(1).font = { ...FONTS.header, size: 12 };
+  overviewSheet.getRow(ratesStartRow).getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.titleBg } };
+
+  overviewSheet.getRow(ratesStartRow + 1).values = ['Rate', 'Value', 'Description'];
+  styleHeaderRow(overviewSheet, ratesStartRow + 1, 3);
+
+  const ratesData: (string | number)[][] = [
+    ['Completion Rate', `${completionRate}%`, `${analytics.completedEvents} of ${analytics.totalEvents} events completed`],
+    ['Approval Rate', `${approvalRate}%`, `${analytics.totalParticipants} of ${analytics.totalRegistrations} registrations approved`],
+    ['Attendance Rate', `${attendanceRate}%`, `${allTotalAttended} of ${analytics.totalParticipants} approved participants attended`],
+  ];
+
+  ratesData.forEach((data, index) => {
+    const r = ratesStartRow + 2 + index;
+    overviewSheet.getRow(r).values = data;
+    overviewSheet.getRow(r).getCell(1).font = FONTS.bold;
+    // Color the value cell based on percentage
+    const pctVal = parseFloat(data[1] as string);
+    const cell = overviewSheet.getRow(r).getCell(2);
+    cell.font = { ...FONTS.bold, size: 11 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    if (pctVal >= 75) {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.successBg } };
+      cell.font = { ...FONTS.bold, size: 11, color: { argb: COLORS.successText } };
+    } else if (pctVal >= 40) {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.warningBg } };
+      cell.font = { ...FONTS.bold, size: 11, color: { argb: COLORS.warningText } };
+    } else {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.errorBg } };
+      cell.font = { ...FONTS.bold, size: 11, color: { argb: COLORS.errorText } };
+    }
+  });
+  styleDataRows(overviewSheet, ratesStartRow + 2, ratesStartRow + 1 + ratesData.length, 3);
+
+  overviewSheet.columns = [{ width: 28 }, { width: 20 }, { width: 45 }];
+
+  // ========== VISUAL DASHBOARD SHEET ==========
+  const dashSheet = addStyledSheet(workbook, 'Dashboard', {
+    title: '📊 Visual Dashboard',
+    subtitle: `Generated: ${timestamp}`,
+  });
+
+  dashSheet.mergeCells('A1:F1');
+  dashSheet.mergeCells('A2:F2');
+
+  // Helper to create a text-based bar
+  const makeBar = (value: number, max: number, width: number = 20): string => {
+    if (max === 0) return '░'.repeat(width);
+    const filled = Math.round((value / max) * width);
+    return '█'.repeat(Math.min(filled, width)) + '░'.repeat(Math.max(0, width - filled));
+  };
+
+  // --- Event Status Distribution ---
+  let row = 3;
+  dashSheet.getRow(row).values = ['📈 EVENT STATUS DISTRIBUTION', '', '', '', '', ''];
+  dashSheet.mergeCells(`A${row}:F${row}`);
+  dashSheet.getRow(row).getCell(1).font = { ...FONTS.header, size: 12 };
+  dashSheet.getRow(row).getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.titleBg } };
+  row++;
+  dashSheet.getRow(row).values = ['Status', 'Count', '% of Total', 'Visual', '', ''];
+  styleHeaderRow(dashSheet, row, 6);
+  row++;
+
+  const maxEvents = analytics.totalEvents;
+  const eventStatusData = [
+    { label: 'Upcoming', value: analytics.upcomingEvents, color: COLORS.headerBg },
+    { label: 'Completed', value: analytics.completedEvents, color: COLORS.successText },
+    { label: 'Cancelled', value: analytics.cancelledEvents, color: COLORS.errorText },
+  ];
+
+  eventStatusData.forEach((item) => {
+    const pct = maxEvents > 0 ? ((item.value / maxEvents) * 100).toFixed(1) : '0.0';
+    dashSheet.getRow(row).values = [item.label, item.value, `${pct}%`, makeBar(item.value, maxEvents), '', ''];
+    dashSheet.getRow(row).getCell(4).font = { name: 'Consolas', size: 10, color: { argb: item.color } };
+    dashSheet.getRow(row).getCell(1).font = FONTS.bold;
+    dashSheet.getRow(row).getCell(2).font = FONTS.bold;
+    row++;
+  });
+
+  styleDataRows(dashSheet, row - eventStatusData.length, row - 1, 6);
+
+  // --- Registration & Attendance Overview ---
+  row += 2;
+  dashSheet.getRow(row).values = ['📝 REGISTRATION & ATTENDANCE', '', '', '', '', ''];
+  dashSheet.mergeCells(`A${row}:F${row}`);
+  dashSheet.getRow(row).getCell(1).font = { ...FONTS.header, size: 12 };
+  dashSheet.getRow(row).getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.titleBg } };
+  row++;
+  dashSheet.getRow(row).values = ['Metric', 'Count', '% of Registrations', 'Visual', '', ''];
+  styleHeaderRow(dashSheet, row, 6);
+  row++;
+
+  const dashTotalAttended = analytics.totalAttended ?? analytics.recentRegistrations.filter(r => r.status === 'attended').length;
+  const maxRegs = analytics.totalRegistrations;
+  const regBarData = [
+    { label: 'Total Registrations', value: analytics.totalRegistrations, color: COLORS.headerBg },
+    { label: 'Approved', value: analytics.totalParticipants, color: '2E7D32' },
+    { label: 'Attended', value: dashTotalAttended, color: COLORS.successText },
+    { label: 'Not Attended', value: analytics.totalParticipants - dashTotalAttended, color: COLORS.warningText },
+  ];
+
+  regBarData.forEach((item) => {
+    const pct = maxRegs > 0 ? ((item.value / maxRegs) * 100).toFixed(1) : '0.0';
+    dashSheet.getRow(row).values = [item.label, item.value, `${pct}%`, makeBar(item.value, maxRegs), '', ''];
+    dashSheet.getRow(row).getCell(4).font = { name: 'Consolas', size: 10, color: { argb: item.color } };
+    dashSheet.getRow(row).getCell(1).font = FONTS.bold;
+    dashSheet.getRow(row).getCell(2).font = FONTS.bold;
+    row++;
+  });
+
+  styleDataRows(dashSheet, row - regBarData.length, row - 1, 6);
+
+  // --- Category Breakdown Visual ---
+  if (analytics.categoryBreakdown.length > 0) {
+    row += 2;
+    dashSheet.getRow(row).values = ['📂 CATEGORY BREAKDOWN', '', '', '', '', ''];
+    dashSheet.mergeCells(`A${row}:F${row}`);
+    dashSheet.getRow(row).getCell(1).font = { ...FONTS.header, size: 12 };
+    dashSheet.getRow(row).getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.titleBg } };
+    row++;
+    dashSheet.getRow(row).values = ['Category', 'Events', '% of Total', 'Visual', '', ''];
+    styleHeaderRow(dashSheet, row, 6);
+    row++;
+
+    const maxCat = Math.max(...analytics.categoryBreakdown.map(c => c.count), 1);
+    const catColors = ['4472C4', 'ED7D31', 'A5A5A5', 'FFC000', '5B9BD5', '70AD47', 'C00000', '7030A0'];
+    analytics.categoryBreakdown.forEach((cat, i) => {
+      const pct = analytics.totalEvents > 0 ? ((cat.count / analytics.totalEvents) * 100).toFixed(1) : '0.0';
+      const color = catColors[i % catColors.length];
+      dashSheet.getRow(row).values = [cat.category, cat.count, `${pct}%`, makeBar(cat.count, maxCat), '', ''];
+      dashSheet.getRow(row).getCell(4).font = { name: 'Consolas', size: 10, color: { argb: color } };
+      dashSheet.getRow(row).getCell(1).font = FONTS.bold;
+      row++;
+    });
+    styleDataRows(dashSheet, row - analytics.categoryBreakdown.length, row - 1, 6);
+  }
+
+  // --- Top Events Fill Rate ---
+  if (analytics.topEvents.length > 0) {
+    row += 2;
+    dashSheet.getRow(row).values = ['🏆 TOP EVENTS - FILL RATE', '', '', '', '', ''];
+    dashSheet.mergeCells(`A${row}:F${row}`);
+    dashSheet.getRow(row).getCell(1).font = { ...FONTS.header, size: 12 };
+    dashSheet.getRow(row).getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.titleBg } };
+    row++;
+    dashSheet.getRow(row).values = ['Event', 'Regs / Cap', 'Fill Rate', 'Visual', '', ''];
+    styleHeaderRow(dashSheet, row, 6);
+    row++;
+
+    analytics.topEvents.slice(0, 10).forEach((evt) => {
+      const fillPct = evt.capacity > 0 ? ((evt.registrations / evt.capacity) * 100) : 0;
+      const fillColor = fillPct >= 90 ? COLORS.successText : fillPct >= 50 ? COLORS.warningText : COLORS.errorText;
+      dashSheet.getRow(row).values = [
+        evt.title.length > 35 ? evt.title.substring(0, 35) + '...' : evt.title,
+        `${evt.registrations} / ${evt.capacity}`,
+        `${fillPct.toFixed(1)}%`,
+        makeBar(evt.registrations, evt.capacity),
+        '', ''
+      ];
+      dashSheet.getRow(row).getCell(4).font = { name: 'Consolas', size: 10, color: { argb: fillColor } };
+      dashSheet.getRow(row).getCell(1).font = FONTS.bold;
+      row++;
+    });
+    styleDataRows(dashSheet, row - analytics.topEvents.slice(0, 10).length, row - 1, 6);
+  }
+
+  // --- Key Rates Visual ---
+  row += 2;
+  dashSheet.getRow(row).values = ['🎯 KEY PERFORMANCE RATES', '', '', '', '', ''];
+  dashSheet.mergeCells(`A${row}:F${row}`);
+  dashSheet.getRow(row).getCell(1).font = { ...FONTS.header, size: 12 };
+  dashSheet.getRow(row).getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.titleBg } };
+  row++;
+  dashSheet.getRow(row).values = ['Rate', 'Percentage', 'Formula', 'Visual', '', ''];
+  styleHeaderRow(dashSheet, row, 6);
+  row++;
+
+  const dashCompletionRate = analytics.totalEvents > 0 ? (analytics.completedEvents / analytics.totalEvents) * 100 : 0;
+  const dashApprovalRate = analytics.totalRegistrations > 0 ? (analytics.totalParticipants / analytics.totalRegistrations) * 100 : 0;
+  const dashAttendanceRate = analytics.totalParticipants > 0 ? (dashTotalAttended / analytics.totalParticipants) * 100 : 0;
+
+  const ratesBarData = [
+    { label: 'Event Completion Rate', pct: dashCompletionRate, formula: `${analytics.completedEvents} completed / ${analytics.totalEvents} total events`, color: dashCompletionRate >= 75 ? COLORS.successText : dashCompletionRate >= 40 ? COLORS.warningText : COLORS.errorText },
+    { label: 'Registration Approval Rate', pct: dashApprovalRate, formula: `${analytics.totalParticipants} approved / ${analytics.totalRegistrations} total registrations`, color: dashApprovalRate >= 75 ? COLORS.successText : dashApprovalRate >= 40 ? COLORS.warningText : COLORS.errorText },
+    { label: 'Attendance Rate', pct: dashAttendanceRate, formula: `${dashTotalAttended} attended / ${analytics.totalParticipants} approved participants`, color: dashAttendanceRate >= 75 ? COLORS.successText : dashAttendanceRate >= 40 ? COLORS.warningText : COLORS.errorText },
+  ];
+
+  ratesBarData.forEach((item) => {
+    dashSheet.getRow(row).values = [item.label, `${item.pct.toFixed(1)}%`, item.formula, makeBar(Math.round(item.pct), 100), '', ''];
+    dashSheet.getRow(row).getCell(4).font = { name: 'Consolas', size: 10, color: { argb: item.color } };
+    dashSheet.getRow(row).getCell(1).font = FONTS.bold;
+    const pctCell = dashSheet.getRow(row).getCell(2);
+    pctCell.font = { ...FONTS.bold, size: 11, color: { argb: item.color } };
+    pctCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    row++;
+  });
+  styleDataRows(dashSheet, row - ratesBarData.length, row - 1, 6);
+
+  dashSheet.columns = [{ width: 30 }, { width: 15 }, { width: 42 }, { width: 30 }, { width: 5 }, { width: 5 }];
 
   // ========== CATEGORIES SHEET ==========
   const categorySheet = addStyledSheet(workbook, 'Categories', {
@@ -601,17 +815,19 @@ export async function exportAnalyticsToExcel(
     subtitle: `Showing top ${analytics.topEvents.length} events`,
   });
 
-  topEventsSheet.mergeCells('A1:G1');
-  topEventsSheet.mergeCells('A2:G2');
+  topEventsSheet.mergeCells('A1:I1');
+  topEventsSheet.mergeCells('A2:I2');
 
-  topEventsSheet.getRow(3).values = ['Rank', 'Event Title', 'Registrations', 'Capacity', 'Fill Rate', 'Status', 'Date'];
-  styleHeaderRow(topEventsSheet, 3, 7);
+  topEventsSheet.getRow(3).values = ['Rank', 'Event Title', 'Conducted By', 'Department', 'Registrations', 'Capacity', 'Fill Rate', 'Status', 'Date'];
+  styleHeaderRow(topEventsSheet, 3, 9);
 
   analytics.topEvents.forEach((event, index) => {
     const row = topEventsSheet.getRow(4 + index);
     row.values = [
       `#${index + 1}`,
       event.title,
+      event.createdBy || 'N/A',
+      event.department || 'N/A',
       event.registrations,
       event.capacity,
       `${((event.registrations / event.capacity) * 100 || 0).toFixed(1)}%`,
@@ -619,15 +835,15 @@ export async function exportAnalyticsToExcel(
       new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     ];
   });
-  styleDataRows(topEventsSheet, 4, 3 + analytics.topEvents.length, 7);
+  styleDataRows(topEventsSheet, 4, 3 + analytics.topEvents.length, 9);
 
-  // Style status column
+  // Style status column (now column 8)
   for (let rowNum = 4; rowNum < 4 + analytics.topEvents.length; rowNum++) {
-    const statusCell = topEventsSheet.getRow(rowNum).getCell(6);
+    const statusCell = topEventsSheet.getRow(rowNum).getCell(8);
     styleStatusCell(statusCell, statusCell.value?.toString() || '');
   }
 
-  topEventsSheet.columns = [{ width: 8 }, { width: 40 }, { width: 15 }, { width: 12 }, { width: 12 }, { width: 15 }, { width: 18 }];
+  topEventsSheet.columns = [{ width: 8 }, { width: 35 }, { width: 20 }, { width: 18 }, { width: 15 }, { width: 12 }, { width: 12 }, { width: 15 }, { width: 18 }];
 
   // ========== RECENT REGISTRATIONS SHEET ==========
   const recentSheet = addStyledSheet(workbook, 'Registrations', {
@@ -638,30 +854,38 @@ export async function exportAnalyticsToExcel(
   recentSheet.mergeCells('A1:E1');
   recentSheet.mergeCells('A2:E2');
 
-  recentSheet.getRow(3).values = ['#', 'Event', 'Participant', 'Date', 'Source'];
+  recentSheet.getRow(3).values = ['#', 'Event', 'Participant', 'Date', 'Attended'];
   styleHeaderRow(recentSheet, 3, 5);
 
   analytics.recentRegistrations.forEach((reg, index) => {
+    const isAttended = reg.status === 'attended';
     recentSheet.getRow(4 + index).values = [
       index + 1,
       reg.eventTitle,
       reg.userName,
       new Date(reg.registeredAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      reg.fromWaitlist ? 'Waitlist' : 'Direct',
+      isAttended ? 'Yes' : 'No',
     ];
   });
   styleDataRows(recentSheet, 4, 3 + analytics.recentRegistrations.length, 5);
 
-  // Style source column
+  // Style attended column
   for (let rowNum = 4; rowNum < 4 + analytics.recentRegistrations.length; rowNum++) {
-    const sourceCell = recentSheet.getRow(rowNum).getCell(5);
-    if (sourceCell.value === 'Waitlist') {
-      sourceCell.fill = {
+    const attendedCell = recentSheet.getRow(rowNum).getCell(5);
+    if (attendedCell.value === 'Yes') {
+      attendedCell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: COLORS.successBg },
+      };
+      attendedCell.font = { ...FONTS.normal, color: { argb: COLORS.successText } };
+    } else {
+      attendedCell.fill = {
         type: 'pattern',
         pattern: 'solid',
         fgColor: { argb: COLORS.warningBg },
       };
-      sourceCell.font = { ...FONTS.normal, color: { argb: COLORS.warningText } };
+      attendedCell.font = { ...FONTS.normal, color: { argb: COLORS.warningText } };
     }
   }
 
@@ -683,6 +907,7 @@ export async function exportSingleEventAnalyticsToExcel(
     cancelledEvents: number;
     totalRegistrations: number;
     totalParticipants: number;
+    totalAttended?: number;
     averageRegistrationsPerEvent: number;
     categoryBreakdown: Array<{ category: string; count: number }>;
     topEvents: Array<{
@@ -691,12 +916,16 @@ export async function exportSingleEventAnalyticsToExcel(
       capacity: number;
       status: string;
       date: string;
+      createdBy?: string;
+      department?: string;
     }>;
     recentRegistrations: Array<{
       eventTitle: string;
       userName: string;
       registeredAt: string;
       fromWaitlist: boolean;
+      status?: string;
+      approvalStatus?: string;
     }>;
   },
   eventName: string
@@ -732,19 +961,26 @@ export async function exportSingleEventAnalyticsToExcel(
   styleHeaderRow(overviewSheet, detailsStartRow + 1, 3);
 
   const fillRate = eventInfo.capacity > 0 ? ((eventInfo.registrations / eventInfo.capacity) * 100).toFixed(1) : '0';
-  const attendanceRate = analytics.totalRegistrations > 0 
-    ? ((analytics.totalParticipants / analytics.totalRegistrations) * 100).toFixed(1) 
+  const totalAttendedCount = analytics.totalAttended ?? analytics.recentRegistrations.filter(r => r.status === 'attended').length;
+  // Attendance rate = attended / approved participants (not total registrations)
+  const attendanceRate = analytics.totalParticipants > 0 
+    ? ((totalAttendedCount / analytics.totalParticipants) * 100).toFixed(1) 
+    : '0';
+  const singleApprovalRate = analytics.totalRegistrations > 0
+    ? ((analytics.totalParticipants / analytics.totalRegistrations) * 100).toFixed(1)
     : '0';
 
   const eventDetailsData = [
     ['Event Name', eventName, ''],
+    ['Conducted By', eventInfo.createdBy || 'N/A', `Department: ${eventInfo.department || 'N/A'}`],
     ['Event Date', new Date(eventInfo.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), ''],
     ['Status', eventInfo.status, ''],
-    ['Total Registrations', analytics.totalRegistrations, ''],
-    ['Confirmed Participants', analytics.totalParticipants, `${attendanceRate}% attendance rate`],
     ['Capacity', eventInfo.capacity, ''],
-    ['Fill Rate', `${fillRate}%`, eventInfo.registrations >= eventInfo.capacity ? 'Fully Booked!' : ''],
-    ['Spots Remaining', Math.max(0, eventInfo.capacity - eventInfo.registrations), ''],
+    ['Total Registrations', analytics.totalRegistrations, ''],
+    ['Approved Participants', analytics.totalParticipants, `${singleApprovalRate}% of registrations approved`],
+    ['Total Attended', totalAttendedCount, `${attendanceRate}% of approved attended`],
+    ['Not Attended', analytics.totalParticipants - totalAttendedCount, ''],
+    ['Fill Rate', `${fillRate}%`, eventInfo.registrations >= eventInfo.capacity ? '⭐ Fully Booked!' : `${Math.max(0, eventInfo.capacity - eventInfo.registrations)} spots remaining`],
   ];
 
   eventDetailsData.forEach((data, index) => {
@@ -752,9 +988,116 @@ export async function exportSingleEventAnalyticsToExcel(
   });
   styleDataRows(overviewSheet, detailsStartRow + 2, detailsStartRow + 1 + eventDetailsData.length, 3);
 
-  // Style status cell
-  const statusCell = overviewSheet.getRow(detailsStartRow + 4).getCell(2);
+  // Style "Conducted By" row
+  overviewSheet.getRow(detailsStartRow + 3).getCell(1).font = FONTS.bold;
+  overviewSheet.getRow(detailsStartRow + 3).getCell(3).font = { ...FONTS.normal, italic: true };
+
+  // Style status cell (row offset: Event Name=0, Conducted By=1, Date=2, Status=3 → row detailsStartRow+5)
+  const statusCell = overviewSheet.getRow(detailsStartRow + 5).getCell(2);
   styleStatusCell(statusCell, statusCell.value?.toString() || '');
+
+  // --- Helper for bar charts ---
+  const makeBar = (value: number, max: number, width: number = 20): string => {
+    if (max === 0) return '░'.repeat(width);
+    const filled = Math.round((value / max) * width);
+    return '█'.repeat(Math.min(filled, width)) + '░'.repeat(Math.max(0, width - filled));
+  };
+
+  // --- Key Performance Rates ---
+  const ratesRow = detailsStartRow + 2 + eventDetailsData.length + 2;
+  overviewSheet.getRow(ratesRow).values = ['🎯 KEY PERFORMANCE RATES', '', ''];
+  overviewSheet.mergeCells(`A${ratesRow}:C${ratesRow}`);
+  overviewSheet.getRow(ratesRow).getCell(1).font = { ...FONTS.header, size: 12 };
+  overviewSheet.getRow(ratesRow).getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.titleBg } };
+
+  overviewSheet.getRow(ratesRow + 1).values = ['Rate', 'Value', 'How It\'s Calculated'];
+  styleHeaderRow(overviewSheet, ratesRow + 1, 3);
+
+  const singleFillPct = parseFloat(fillRate);
+  const singleAttPct = parseFloat(attendanceRate);
+  const singleAppPct = parseFloat(singleApprovalRate);
+
+  const singleRatesData: { label: string; pct: number; desc: string }[] = [
+    { label: 'Fill Rate', pct: singleFillPct, desc: `${analytics.totalRegistrations} registrations / ${eventInfo.capacity} capacity` },
+    { label: 'Approval Rate', pct: singleAppPct, desc: `${analytics.totalParticipants} approved / ${analytics.totalRegistrations} total registrations` },
+    { label: 'Attendance Rate', pct: singleAttPct, desc: `${totalAttendedCount} attended / ${analytics.totalParticipants} approved participants` },
+  ];
+
+  singleRatesData.forEach((item, i) => {
+    const r = ratesRow + 2 + i;
+    overviewSheet.getRow(r).values = [item.label, `${item.pct.toFixed(1)}%`, item.desc];
+    overviewSheet.getRow(r).getCell(1).font = FONTS.bold;
+    const pctCell = overviewSheet.getRow(r).getCell(2);
+    pctCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    if (item.pct >= 75) {
+      pctCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.successBg } };
+      pctCell.font = { ...FONTS.bold, size: 11, color: { argb: COLORS.successText } };
+    } else if (item.pct >= 40) {
+      pctCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.warningBg } };
+      pctCell.font = { ...FONTS.bold, size: 11, color: { argb: COLORS.warningText } };
+    } else {
+      pctCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.errorBg } };
+      pctCell.font = { ...FONTS.bold, size: 11, color: { argb: COLORS.errorText } };
+    }
+  });
+  styleDataRows(overviewSheet, ratesRow + 2, ratesRow + 1 + singleRatesData.length, 3);
+
+  // --- Visual Bar Charts ---
+  const vizStartRow = ratesRow + singleRatesData.length + 3;
+  overviewSheet.getRow(vizStartRow).values = ['📊 VISUAL COMPARISON', '', ''];
+  overviewSheet.mergeCells(`A${vizStartRow}:C${vizStartRow}`);
+  overviewSheet.getRow(vizStartRow).getCell(1).font = { ...FONTS.header, size: 12 };
+  overviewSheet.getRow(vizStartRow).getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.titleBg } };
+
+  overviewSheet.getRow(vizStartRow + 1).values = ['Metric', 'Count', 'Visual Bar'];
+  styleHeaderRow(overviewSheet, vizStartRow + 1, 3);
+
+  const maxVal = Math.max(analytics.totalRegistrations, eventInfo.capacity, 1);
+  const vizData = [
+    { label: 'Capacity', value: eventInfo.capacity, color: 'A5A5A5' },
+    { label: 'Registrations', value: analytics.totalRegistrations, color: COLORS.headerBg },
+    { label: 'Approved', value: analytics.totalParticipants, color: '2E7D32' },
+    { label: 'Attended', value: totalAttendedCount, color: COLORS.successText },
+    { label: 'Not Attended', value: analytics.totalParticipants - totalAttendedCount, color: COLORS.warningText },
+  ];
+
+  vizData.forEach((item, i) => {
+    const r = vizStartRow + 2 + i;
+    overviewSheet.getRow(r).values = [item.label, item.value, makeBar(item.value, maxVal)];
+    overviewSheet.getRow(r).getCell(3).font = { name: 'Consolas', size: 10, color: { argb: item.color } };
+    overviewSheet.getRow(r).getCell(1).font = FONTS.bold;
+    overviewSheet.getRow(r).getCell(2).font = FONTS.bold;
+  });
+  styleDataRows(overviewSheet, vizStartRow + 2, vizStartRow + 1 + vizData.length, 3);
+
+  // --- Rate Gauges (percentage bars out of 100%) ---
+  const gaugeStartRow = vizStartRow + vizData.length + 3;
+  overviewSheet.getRow(gaugeStartRow).values = ['📈 RATE GAUGES', '', ''];
+  overviewSheet.mergeCells(`A${gaugeStartRow}:C${gaugeStartRow}`);
+  overviewSheet.getRow(gaugeStartRow).getCell(1).font = { ...FONTS.header, size: 12 };
+  overviewSheet.getRow(gaugeStartRow).getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.titleBg } };
+
+  overviewSheet.getRow(gaugeStartRow + 1).values = ['Rate', 'Percentage', 'Gauge (0-100%)'];
+  styleHeaderRow(overviewSheet, gaugeStartRow + 1, 3);
+
+  const gaugeData = [
+    { label: 'Fill Rate', pct: singleFillPct, color: singleFillPct >= 90 ? COLORS.successText : singleFillPct >= 50 ? COLORS.warningText : COLORS.errorText },
+    { label: 'Approval Rate', pct: singleAppPct, color: singleAppPct >= 75 ? COLORS.successText : singleAppPct >= 40 ? COLORS.warningText : COLORS.errorText },
+    { label: 'Attendance Rate', pct: singleAttPct, color: singleAttPct >= 75 ? COLORS.successText : singleAttPct >= 40 ? COLORS.warningText : COLORS.errorText },
+  ];
+
+  gaugeData.forEach((item, i) => {
+    const r = gaugeStartRow + 2 + i;
+    overviewSheet.getRow(r).values = [item.label, `${item.pct.toFixed(1)}%`, makeBar(Math.round(item.pct), 100)];
+    overviewSheet.getRow(r).getCell(3).font = { name: 'Consolas', size: 10, color: { argb: item.color } };
+    overviewSheet.getRow(r).getCell(1).font = FONTS.bold;
+    overviewSheet.getRow(r).getCell(2).font = { ...FONTS.bold, size: 11 };
+    overviewSheet.getRow(r).getCell(2).alignment = { vertical: 'middle', horizontal: 'center' };
+  });
+  styleDataRows(overviewSheet, gaugeStartRow + 2, gaugeStartRow + 1 + gaugeData.length, 3);
+
+  // Update column widths to fit visual bars
+  overviewSheet.columns = [{ width: 30 }, { width: 25 }, { width: 45 }];
 
   // ========== REGISTRATIONS SHEET ==========
   const recentSheet = addStyledSheet(workbook, 'Registrations', {
@@ -762,13 +1105,14 @@ export async function exportSingleEventAnalyticsToExcel(
     subtitle: `Total Registrations: ${analytics.recentRegistrations.length} | Generated: ${timestamp}`,
   });
 
-  recentSheet.mergeCells('A1:E1');
-  recentSheet.mergeCells('A2:E2');
+  recentSheet.mergeCells('A1:D1');
+  recentSheet.mergeCells('A2:D2');
 
-  recentSheet.getRow(3).values = ['S.No', 'Participant Name', 'Registered At', 'Source', 'Status'];
-  styleHeaderRow(recentSheet, 3, 5);
+  recentSheet.getRow(3).values = ['S.No', 'Participant Name', 'Registered At', 'Attended'];
+  styleHeaderRow(recentSheet, 3, 4);
 
   analytics.recentRegistrations.forEach((reg, index) => {
+    const isAttended = reg.status === 'attended';
     recentSheet.getRow(4 + index).values = [
       index + 1,
       reg.userName,
@@ -779,38 +1123,45 @@ export async function exportSingleEventAnalyticsToExcel(
         hour: '2-digit', 
         minute: '2-digit' 
       }),
-      reg.fromWaitlist ? 'Waitlist' : 'Direct',
-      'Registered',
+      isAttended ? 'Yes' : 'No',
     ];
   });
   
   if (analytics.recentRegistrations.length > 0) {
-    styleDataRows(recentSheet, 4, 3 + analytics.recentRegistrations.length, 5);
+    styleDataRows(recentSheet, 4, 3 + analytics.recentRegistrations.length, 4);
 
-    // Style source column
+    // Style attended column
     for (let rowNum = 4; rowNum < 4 + analytics.recentRegistrations.length; rowNum++) {
-      const sourceCell = recentSheet.getRow(rowNum).getCell(4);
-      if (sourceCell.value === 'Waitlist') {
-        sourceCell.fill = {
+      const attendedCell = recentSheet.getRow(rowNum).getCell(4);
+      if (attendedCell.value === 'Yes') {
+        attendedCell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: COLORS.successBg },
+        };
+        attendedCell.font = { ...FONTS.normal, color: { argb: COLORS.successText } };
+      } else {
+        attendedCell.fill = {
           type: 'pattern',
           pattern: 'solid',
           fgColor: { argb: COLORS.warningBg },
         };
-        sourceCell.font = { ...FONTS.normal, color: { argb: COLORS.warningText } };
+        attendedCell.font = { ...FONTS.normal, color: { argb: COLORS.warningText } };
       }
-      
-      // Style status as success
-      const statusCell = recentSheet.getRow(rowNum).getCell(5);
-      styleStatusCell(statusCell, 'registered');
     }
   }
 
   // Add summary row
   if (analytics.recentRegistrations.length > 0) {
-    addSummaryRow(recentSheet, 4 + analytics.recentRegistrations.length + 1, 'Total Registrations:', analytics.recentRegistrations.length, 5);
+    const attendedCount = analytics.recentRegistrations.filter(r => r.status === 'attended').length;
+    addSummaryRow(recentSheet, 4 + analytics.recentRegistrations.length + 1, 'Total Registrations:', analytics.recentRegistrations.length, 4);
+    const attendedSummaryRow = 4 + analytics.recentRegistrations.length + 2;
+    recentSheet.getRow(attendedSummaryRow).values = ['', '', 'Total Attended:', attendedCount];
+    recentSheet.getRow(attendedSummaryRow).getCell(3).font = { ...FONTS.header, size: 11 };
+    recentSheet.getRow(attendedSummaryRow).getCell(4).font = { ...FONTS.header, size: 11, color: { argb: COLORS.successText } };
   }
 
-  recentSheet.columns = [{ width: 8 }, { width: 30 }, { width: 25 }, { width: 15 }, { width: 15 }];
+  recentSheet.columns = [{ width: 8 }, { width: 30 }, { width: 25 }, { width: 15 }];
 
   // Download with event name
   const safeEventName = eventName.replace(/[^a-zA-Z0-9]/g, '_');
