@@ -178,6 +178,9 @@ const EventDetails: React.FC = () => {
   const [eventGallery, setEventGallery] = useState<{ published: boolean; mediaCount: number } | null>(null);
   const [checkingGallery, setCheckingGallery] = useState(false);
 
+  // Event-specific registrations (fetched via per-event endpoint so all users can see participants)
+  const [allEventRegistrations, setAllEventRegistrations] = useState<Registration[]>([]);
+
   // Stable user ID and role to prevent callback recreation
   const userId = user?._id || user?.id;
   const userRole = user?.role;
@@ -857,12 +860,48 @@ const EventDetails: React.FC = () => {
   });
 
   // Get all registrations for this event
-  const eventRegistrations = safeRegistrations.filter(r => {
-    const regEventId = typeof r.eventId === 'string' ? r.eventId : String(r.eventId);
-    return regEventId === id || 
-      (event && regEventId === event.id) || 
-      (event && regEventId === event._id);
-  });
+  // Prefer allEventRegistrations (fetched from per-event endpoint, available to all users)
+  // Fall back to filtering from global registrations (admin-only full list)
+  const eventRegistrations = allEventRegistrations.length > 0
+    ? allEventRegistrations
+    : safeRegistrations.filter(r => {
+        const regEventId = typeof r.eventId === 'string' ? r.eventId : String(r.eventId);
+        return regEventId === id || 
+          (event && regEventId === event.id) || 
+          (event && regEventId === event._id);
+      });
+
+  // Fetch all registrations for this event (so all logged-in users can see participants)
+  const fetchEventRegistrations = useCallback(async () => {
+    if (!id) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/events/${id}/registrations`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.registrations && Array.isArray(data.registrations)) {
+          // Normalize to match the Registration shape expected by the frontend
+          const normalized: Registration[] = data.registrations.map((r: any) => ({
+            ...r,
+            id: r._id || r.id,
+            // The per-event endpoint populates userId as a full user object
+            user: typeof r.userId === 'object' ? r.userId : r.user || r.userId,
+            userId: typeof r.userId === 'object' ? (r.userId._id || r.userId.id) : r.userId,
+            eventId: typeof r.eventId === 'object' ? (r.eventId._id || r.eventId.id) : r.eventId,
+          }));
+          setAllEventRegistrations(normalized);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching event registrations:', error);
+    }
+  }, [id]);
+
+  // Fetch event registrations on mount for all users
+  useEffect(() => {
+    if (id && user) {
+      fetchEventRegistrations();
+    }
+  }, [id, user, fetchEventRegistrations]);
 
   // Fetch team mappings for all users in this event
   const fetchUserTeamMappings = useCallback(async () => {
@@ -1451,6 +1490,8 @@ const EventDetails: React.FC = () => {
     if (result.ok) {
       // Refresh pending count for organizers/admins
       fetchPendingCount();
+      // Refresh event registrations list
+      fetchEventRegistrations();
       
       if (result.pending) {
         addToast({
@@ -1485,6 +1526,8 @@ const EventDetails: React.FC = () => {
   const handleUnregister = async () => {
     const success = await unregisterFromEvent(event.id);
     if (success) {
+      // Refresh event registrations list
+      fetchEventRegistrations();
       addToast({
         type: 'success',
         title: 'Unregistered Successfully',
@@ -1615,7 +1658,8 @@ const EventDetails: React.FC = () => {
           title: isAttended ? 'Attendance Reverted' : 'Marked as Attended',
           message: `${reg.user?.name || 'User'} has been ${isAttended ? 'unmarked' : 'marked as attended'}.`,
         });
-        // Also refresh context data in background
+        // Refresh event registrations list and context data
+        fetchEventRegistrations();
         window.dispatchEvent(new Event('forceRefresh'));
       } else {
         addToast({ type: 'error', title: 'Error', message: data.error || 'Failed to update attendance.' });
@@ -1633,6 +1677,8 @@ const EventDetails: React.FC = () => {
     const { userId, userName } = confirmRemoveParticipant;
     const success = await removeParticipant(event.id, userId);
     if (success) {
+      // Refresh event registrations list
+      fetchEventRegistrations();
       addToast({ 
         type: 'success', 
         title: 'Participant Removed', 
