@@ -45,20 +45,28 @@ const Home: React.FC = () => {
     }
   };
 
-  // Get active event IDs (upcoming events)
-  const activeEventIds = events.filter(e => e.status === 'upcoming').map(e => e.id);
-  
-  // Count registrations only for active events (only approved/registered, not pending)
-  // Use registrations array when available, fall back to summing event.currentParticipants
-  const activeRegistrationsFromRegs = registrations.filter(r => activeEventIds.includes(r.eventId) && (r.approvalStatus === 'approved' || r.status === 'registered')).length;
+  // Active event IDs for cross-referencing with registrations
+  const activeEventIds = new Set(events.filter(e => e.status === 'upcoming').map(e => e.id));
+
+  // Count only registered students for active (upcoming) events
+  // For admin: registrations contains all users' registrations, so this is the true global count of students
+  // For non-admin: registrations is user-scoped, so fall back to event.currentParticipants
+  const isAdmin = user?.role === 'admin';
+  const studentRegsForActiveEvents = registrations.filter(r =>
+    activeEventIds.has(r.eventId) &&
+    r.user?.role === 'student' &&
+    (r.approvalStatus === 'approved' || r.status === 'registered')
+  ).length;
   const activeRegistrationsFromEvents = events
     .filter(e => e.status === 'upcoming')
     .reduce((sum, e) => sum + (e.currentParticipants || 0), 0);
-  const activeRegistrationsCount = activeRegistrationsFromRegs > 0 ? activeRegistrationsFromRegs : activeRegistrationsFromEvents;
+  // Use registration-based count for admins (accurate student-only count), fallback for others
+  const activeRegistrationsCount = isAdmin && studentRegsForActiveEvents > 0
+    ? studentRegsForActiveEvents
+    : activeRegistrationsFromEvents;
 
-  // Compute participant counts from registrations (more authoritative than event.currentParticipants)
-  const approvedOrRegistered = (r: { approvalStatus?: string; status?: string }) => r.approvalStatus === 'approved' || r.status === 'registered';
-  const totalParticipantsFromRegistrations = registrations.filter(approvedOrRegistered).length;
+  // Total participants across all events (use event.currentParticipants which is the authoritative server count)
+  const totalParticipants = events.reduce((sum, e) => sum + (e.currentParticipants || 0), 0);
 
   const stats = [
     {
@@ -78,7 +86,7 @@ const Home: React.FC = () => {
     {
       icon: Users,
       label: 'Total Participants',
-      value: totalParticipantsFromRegistrations > 0 ? totalParticipantsFromRegistrations : events.reduce((sum, event) => sum + event.currentParticipants, 0),
+      value: totalParticipants,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
     },

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Loader, Image, Camera, Sparkles, ChevronLeft, ChevronRight, Plus, X, EyeOff } from 'lucide-react';
+import { Loader, Image, Camera, Sparkles, ChevronLeft, ChevronRight, Plus, X, EyeOff, Eye } from 'lucide-react';
 import { useGalleryList } from '../hooks/useGallery';
 import { useAuth } from '../contexts/AuthContext';
 import GalleryCard from '../components/GalleryCard';
@@ -51,7 +51,19 @@ export const Gallery: React.FC = () => {
   // Alert modal state
   const [alertModal, setAlertModal] = useState<{ show: boolean; title: string; message: string } | null>(null);
 
+  // Gallery filter tab state (for admin/organizer)
+  const [galleryFilter, setGalleryFilter] = useState<'all' | 'published' | 'unpublished'>('all');
+
   const isAdminOrOrganizer = user && (user.role === 'admin' || user.role === 'organizer');
+
+  // Filter galleries based on selected tab
+  const filteredGalleries = isAdminOrOrganizer
+    ? galleries.filter(g => {
+        if (galleryFilter === 'published') return g.published === true;
+        if (galleryFilter === 'unpublished') return g.published === false;
+        return true; // 'all'
+      })
+    : galleries;
 
   useEffect(() => {
     refetch(page, 12);
@@ -209,6 +221,40 @@ export const Gallery: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Gallery Filter Tabs for Admin/Organizer */}
+      {isAdminOrOrganizer && (
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 z-20 relative mb-6">
+          <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-1.5">
+            {([
+              { key: 'all' as const, label: 'All Galleries', icon: Image, count: galleries.length },
+              { key: 'published' as const, label: 'Published', icon: Eye, count: galleries.filter(g => g.published === true).length },
+              { key: 'unpublished' as const, label: 'Unpublished', icon: EyeOff, count: galleries.filter(g => g.published === false).length },
+            ]).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setGalleryFilter(tab.key)}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 ${
+                  galleryFilter === tab.key
+                    ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white shadow-lg shadow-violet-500/20'
+                    : 'text-white/60 hover:text-white/90 hover:bg-white/10'
+                }`}
+              >
+                <tab.icon size={16} />
+                <span>{tab.label}</span>
+                <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                  galleryFilter === tab.key
+                    ? 'bg-white/20 text-white'
+                    : 'bg-white/10 text-white/50'
+                }`}>
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Animated Background */}
       <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-purple-900/90 to-slate-900 -z-10">
         {/* Floating orbs */}
@@ -288,7 +334,7 @@ export const Gallery: React.FC = () => {
         )}
 
         {/* Content */}
-        {galleries.length === 0 ? (
+        {filteredGalleries.length === 0 ? (
           <motion.div 
             className="text-center py-12 sm:py-20"
             initial={{ opacity: 0, scale: 0.9 }}
@@ -313,11 +359,15 @@ export const Gallery: React.FC = () => {
                 </div>
 
                 <h3 className="text-2xl sm:text-3xl font-bold text-white mb-3">
-                  No galleries yet
+                  {galleryFilter === 'unpublished' ? 'No unpublished galleries' : galleryFilter === 'published' ? 'No published galleries' : 'No galleries yet'}
                 </h3>
                 <p className="text-white/60 text-base sm:text-lg leading-relaxed">
-                  Beautiful moments are being captured.<br />
-                  Check back soon for stunning event memories!
+                  {galleryFilter === 'unpublished'
+                    ? 'All your galleries are currently published.'
+                    : galleryFilter === 'published'
+                    ? 'No galleries have been published yet.'
+                    : (<>Beautiful moments are being captured.<br />Check back soon for stunning event memories!</>)
+                  }
                 </p>
 
                 {/* Decorative line */}
@@ -335,10 +385,10 @@ export const Gallery: React.FC = () => {
               transition={{ delay: 0.6 }}
             >
               <h2 className="text-xl sm:text-2xl font-semibold text-white">
-                Browse Galleries
+                {galleryFilter === 'published' ? 'Published Galleries' : galleryFilter === 'unpublished' ? 'Unpublished Galleries' : 'Browse Galleries'}
               </h2>
               <div className="text-sm text-white/50">
-                Showing {galleries.length} galleries
+                Showing {filteredGalleries.length} {galleryFilter !== 'all' ? galleryFilter + ' ' : ''}galleries
               </div>
             </motion.div>
 
@@ -349,7 +399,7 @@ export const Gallery: React.FC = () => {
               initial="hidden"
               animate="visible"
             >
-              {galleries.map((gallery, index) => (
+              {filteredGalleries.map((gallery, index) => (
                 <GalleryCard
                   key={gallery.id}
                   event={{
