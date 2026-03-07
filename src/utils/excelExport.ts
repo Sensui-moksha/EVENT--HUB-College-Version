@@ -171,7 +171,7 @@ export function styleStatusCell(cell: ExcelJS.Cell, status: string): void {
       fgColor: { argb: COLORS.warningBg },
     };
     cell.font = { ...FONTS.bold, color: { argb: COLORS.warningText } };
-  } else if (statusLower.includes('cancel') || statusLower.includes('reject') || statusLower.includes('fail')) {
+  } else if (statusLower.includes('cancel') || statusLower.includes('reject') || statusLower.includes('fail') || statusLower.includes('absent')) {
     cell.fill = {
       type: 'pattern',
       pattern: 'solid',
@@ -284,7 +284,10 @@ export async function exportParticipantsToExcel(
     status: string;
     approvalType?: string;
   }>,
-  eventTitle: string
+  eventTitle: string,
+  eventStatus?: string,
+  teamMap?: Record<string, { teamName: string; role: string }>,
+  teams?: TeamData[],
 ): Promise<void> {
   const workbook = createStyledWorkbook();
   
@@ -306,8 +309,19 @@ export async function exportParticipantsToExcel(
     { header: 'Mobile', key: 'mobile', width: 15 },
     { header: 'Registered At', key: 'registeredAt', width: 20 },
     { header: 'Status', key: 'status', width: 12 },
+    { header: 'Attendance', key: 'attendance', width: 14 },
     { header: 'Approval Type', key: 'approvalType', width: 18 },
   ];
+
+  // Add team columns if team data is provided
+  const hasTeams = teamMap && Object.keys(teamMap).length > 0;
+  if (hasTeams) {
+    // Insert team columns before Attendance
+    columns.splice(11, 0,
+      { header: 'Team Name', key: 'teamName', width: 20 },
+      { header: 'Team Role', key: 'teamRole', width: 14 },
+    );
+  }
 
   // Set column widths manually (don't use worksheet.columns with headers to avoid duplicate header row)
   columns.forEach((col, index) => {
@@ -316,9 +330,10 @@ export async function exportParticipantsToExcel(
     column.key = col.key;
   });
 
-  // Merge title cells
-  worksheet.mergeCells('A1:L1');
-  worksheet.mergeCells('A2:L2');
+  // Merge title cells across all columns
+  const lastColLetter = String.fromCharCode(64 + columns.length);
+  worksheet.mergeCells(`A1:${lastColLetter}1`);
+  worksheet.mergeCells(`A2:${lastColLetter}2`);
 
   // Add header row at row 3
   const headerRowNumber = 3;
@@ -327,6 +342,9 @@ export async function exportParticipantsToExcel(
     headerRow.getCell(index + 1).value = col.header;
   });
   styleHeaderRow(worksheet, headerRowNumber, columns.length);
+
+  // Determine if event is completed
+  const isCompleted = eventStatus === 'completed';
 
   // Add data rows starting at row 4
   const dataStartRow = 4;
@@ -341,7 +359,11 @@ export async function exportParticipantsToExcel(
           ? 'Waiting List'
           : '';
 
-    row.values = [
+    // Determine attendance label
+    const isAttended = participant.status === 'attended';
+    const attendanceLabel = isAttended ? 'Attended' : (isCompleted ? 'Absent' : 'Pending');
+
+    const rowValues: (string | number)[] = [
       index + 1,
       participant.user.regId || 'N/A',
       participant.user.name,
@@ -353,22 +375,45 @@ export async function exportParticipantsToExcel(
       participant.user.mobile || 'N/A',
       new Date(participant.registeredAt).toLocaleString(),
       participant.status,
-      approvalTypeLabel,
     ];
+
+    if (hasTeams) {
+      const userId = (participant.user as any)?._id || (participant.user as any)?.id;
+      const teamInfo = userId && teamMap ? teamMap[userId] : null;
+      rowValues.push(teamInfo?.teamName || 'No Team');
+      rowValues.push(teamInfo?.role === 'leader' ? 'Leader' : (teamInfo?.role || 'N/A'));
+    }
+
+    rowValues.push(attendanceLabel);
+    rowValues.push(approvalTypeLabel);
+
+    row.values = rowValues;
   });
 
   // Style data rows
   const dataEndRow = dataStartRow + participants.length - 1;
   styleDataRows(worksheet, dataStartRow, dataEndRow, columns.length);
 
-  // Style status column
+  // Find column indices by key
+  const statusColIdx = columns.findIndex(c => c.key === 'status') + 1;
+  const attendanceColIdx = columns.findIndex(c => c.key === 'attendance') + 1;
+
+  // Style status and attendance columns
   for (let rowNum = dataStartRow; rowNum <= dataEndRow; rowNum++) {
-    const statusCell = worksheet.getRow(rowNum).getCell(11); // Status column (shifted to 11 after adding college)
+    const statusCell = worksheet.getRow(rowNum).getCell(statusColIdx);
     styleStatusCell(statusCell, statusCell.value?.toString() || '');
+    
+    const attendanceCell = worksheet.getRow(rowNum).getCell(attendanceColIdx);
+    styleStatusCell(attendanceCell, attendanceCell.value?.toString() || '');
   }
 
   // Add summary row
   addSummaryRow(worksheet, dataEndRow + 2, 'Total Participants:', participants.length, columns.length);
+
+  // Add Teams Registration sheets if teams data is provided
+  if (teams && teams.length > 0) {
+    addTeamsSheets(workbook, teams, eventTitle);
+  }
 
   // Download
   const filename = `${eventTitle.replace(/[^a-zA-Z0-9]/g, '_')}_participants.xlsx`;
@@ -388,7 +433,9 @@ export async function exportAttendeesToExcel(
     registeredAt: string;
     scannedAt?: string;
   }>,
-  subEventTitle: string
+  subEventTitle: string,
+  eventStatus?: string,
+  teams?: TeamData[],
 ): Promise<void> {
   const workbook = createStyledWorkbook();
   
@@ -397,7 +444,9 @@ export async function exportAttendeesToExcel(
     subtitle: `Total Attendees: ${attendees.length} | Generated: ${new Date().toLocaleString()}`,
   });
 
-  const columns = [
+  const isCompleted = eventStatus === 'completed';
+
+  const columns: ColumnConfig[] = [
     { header: 'S.No', key: 'sno', width: 8 },
     { header: 'Name', key: 'name', width: 25 },
     { header: 'Email', key: 'email', width: 30 },
@@ -409,6 +458,7 @@ export async function exportAttendeesToExcel(
     { header: 'Registration ID', key: 'registrationId', width: 20 },
     { header: 'Source', key: 'source', width: 12 },
     { header: 'Status', key: 'status', width: 12 },
+    { header: 'Attendance', key: 'attendance', width: 14 },
     { header: 'Registered At', key: 'registeredAt', width: 20 },
     { header: 'Scanned At', key: 'scannedAt', width: 20 },
   ];
@@ -420,9 +470,10 @@ export async function exportAttendeesToExcel(
     column.key = col.key;
   });
 
-  // Merge title cells
-  worksheet.mergeCells('A1:M1');
-  worksheet.mergeCells('A2:M2');
+  // Merge title cells across all columns
+  const lastColLetter = String.fromCharCode(64 + columns.length);
+  worksheet.mergeCells(`A1:${lastColLetter}1`);
+  worksheet.mergeCells(`A2:${lastColLetter}2`);
 
   const headerRowNumber = 3;
   const headerRow = worksheet.getRow(headerRowNumber);
@@ -436,6 +487,10 @@ export async function exportAttendeesToExcel(
     const row = worksheet.getRow(dataStartRow + index);
     const userInfo = attendee.userId || attendee.user;
     
+    // Determine attendance label
+    const isAttended = attendee.status === 'attended';
+    const attendanceLabel = isAttended ? 'Attended' : (isCompleted ? 'Absent' : 'Pending');
+
     row.values = [
       index + 1,
       userInfo?.name || 'N/A',
@@ -448,6 +503,7 @@ export async function exportAttendeesToExcel(
       attendee.registrationId,
       attendee.source === 'waitlist' ? 'Waitlist' : 'Direct',
       attendee.status,
+      attendanceLabel,
       new Date(attendee.registeredAt).toLocaleString(),
       attendee.scannedAt ? new Date(attendee.scannedAt).toLocaleString() : 'Not Scanned',
     ];
@@ -456,12 +512,20 @@ export async function exportAttendeesToExcel(
   const dataEndRow = dataStartRow + attendees.length - 1;
   styleDataRows(worksheet, dataStartRow, dataEndRow, columns.length);
 
-  // Style status and source columns (adjusted for college column addition)
+  // Find column indices by key
+  const statusColIdx = columns.findIndex(c => c.key === 'status') + 1;
+  const attendanceColIdx = columns.findIndex(c => c.key === 'attendance') + 1;
+  const sourceColIdx = columns.findIndex(c => c.key === 'source') + 1;
+
+  // Style status, attendance, and source columns
   for (let rowNum = dataStartRow; rowNum <= dataEndRow; rowNum++) {
-    const statusCell = worksheet.getRow(rowNum).getCell(11); // Status column (shifted to 11 after adding college)
+    const statusCell = worksheet.getRow(rowNum).getCell(statusColIdx);
     styleStatusCell(statusCell, statusCell.value?.toString() || '');
     
-    const sourceCell = worksheet.getRow(rowNum).getCell(10); // Source column (shifted to 10 after adding college)
+    const attendanceCell = worksheet.getRow(rowNum).getCell(attendanceColIdx);
+    styleStatusCell(attendanceCell, attendanceCell.value?.toString() || '');
+    
+    const sourceCell = worksheet.getRow(rowNum).getCell(sourceColIdx);
     if (sourceCell.value === 'Waitlist') {
       sourceCell.fill = {
         type: 'pattern',
@@ -474,8 +538,222 @@ export async function exportAttendeesToExcel(
 
   addSummaryRow(worksheet, dataEndRow + 2, 'Total Attendees:', attendees.length, columns.length);
 
+  // Add Teams Registration sheets if teams data is provided
+  if (teams && teams.length > 0) {
+    addTeamsSheets(workbook, teams, subEventTitle);
+  }
+
   const filename = `${subEventTitle.replace(/[^a-zA-Z0-9]/g, '_')}_attendees.xlsx`;
   await downloadWorkbook(workbook, filename);
+}
+
+/**
+ * Team data type for teams sheet generation
+ */
+interface TeamData {
+  _id: string;
+  name: string;
+  status: string;
+  leaderId?: { _id?: string; name?: string; email?: string; department?: string; year?: number };
+  members?: Array<{
+    userId?: { _id?: string; name?: string; email?: string; department?: string; year?: number };
+    role?: string;
+    joinedAt?: string;
+  }>;
+  createdAt?: string;
+}
+
+/**
+ * Add Teams Registration sheets to an existing workbook
+ */
+function addTeamsSheets(
+  workbook: ExcelJS.Workbook,
+  teams: TeamData[],
+  eventTitle: string
+): void {
+  if (!teams || teams.length === 0) return;
+
+  // ========== TEAMS OVERVIEW SHEET ==========
+  const overviewSheet = addStyledSheet(workbook, 'Teams Overview', {
+    title: `📋 ${eventTitle} - Teams Overview`,
+    subtitle: `Total Teams: ${teams.length} | Generated: ${new Date().toLocaleString()}`,
+  });
+
+  const overviewColumns: ColumnConfig[] = [
+    { header: 'S.No', key: 'sno', width: 8 },
+    { header: 'Team Name', key: 'teamName', width: 25 },
+    { header: 'Leader Name', key: 'leaderName', width: 25 },
+    { header: 'Leader Email', key: 'leaderEmail', width: 30 },
+    { header: 'Leader Dept', key: 'leaderDept', width: 15 },
+    { header: 'Members Count', key: 'membersCount', width: 15 },
+    { header: 'Status', key: 'status', width: 14 },
+    { header: 'Created At', key: 'createdAt', width: 20 },
+  ];
+
+  overviewColumns.forEach((col, index) => {
+    const column = overviewSheet.getColumn(index + 1);
+    column.width = col.width;
+    column.key = col.key;
+  });
+
+  const ovLastCol = String.fromCharCode(64 + overviewColumns.length);
+  overviewSheet.mergeCells(`A1:${ovLastCol}1`);
+  overviewSheet.mergeCells(`A2:${ovLastCol}2`);
+
+  const ovHeaderRow = 3;
+  const ovHeader = overviewSheet.getRow(ovHeaderRow);
+  overviewColumns.forEach((col, index) => {
+    ovHeader.getCell(index + 1).value = col.header;
+  });
+  styleHeaderRow(overviewSheet, ovHeaderRow, overviewColumns.length);
+
+  const ovDataStart = 4;
+  teams.forEach((team, index) => {
+    const row = overviewSheet.getRow(ovDataStart + index);
+    const totalMembers = (team.members?.length || 0);
+    row.values = [
+      index + 1,
+      team.name,
+      team.leaderId?.name || 'N/A',
+      team.leaderId?.email || 'N/A',
+      team.leaderId?.department || 'N/A',
+      totalMembers,
+      team.status.charAt(0).toUpperCase() + team.status.slice(1),
+      team.createdAt ? new Date(team.createdAt).toLocaleString() : 'N/A',
+    ];
+  });
+
+  const ovDataEnd = ovDataStart + teams.length - 1;
+  styleDataRows(overviewSheet, ovDataStart, ovDataEnd, overviewColumns.length);
+
+  const ovStatusIdx = overviewColumns.findIndex(c => c.key === 'status') + 1;
+  for (let rowNum = ovDataStart; rowNum <= ovDataEnd; rowNum++) {
+    const cell = overviewSheet.getRow(rowNum).getCell(ovStatusIdx);
+    const val = cell.value?.toString()?.toLowerCase() || '';
+    if (val === 'complete' || val === 'registered') {
+      styleStatusCell(cell, 'confirmed');
+    } else if (val === 'forming') {
+      styleStatusCell(cell, 'pending');
+    } else if (val === 'disqualified') {
+      styleStatusCell(cell, 'rejected');
+    }
+  }
+
+  addSummaryRow(overviewSheet, ovDataEnd + 2, 'Total Teams:', teams.length, overviewColumns.length);
+
+  // ========== TEAM MEMBERS DETAIL SHEET ==========
+  const membersSheet = addStyledSheet(workbook, 'Team Members', {
+    title: `📋 ${eventTitle} - All Team Members`,
+    subtitle: `Generated: ${new Date().toLocaleString()}`,
+  });
+
+  const memberColumns: ColumnConfig[] = [
+    { header: 'S.No', key: 'sno', width: 8 },
+    { header: 'Team Name', key: 'teamName', width: 25 },
+    { header: 'Team Status', key: 'teamStatus', width: 14 },
+    { header: 'Member Name', key: 'memberName', width: 25 },
+    { header: 'Email', key: 'email', width: 30 },
+    { header: 'Department', key: 'department', width: 15 },
+    { header: 'Year', key: 'year', width: 8 },
+    { header: 'Role in Team', key: 'teamRole', width: 14 },
+    { header: 'Joined At', key: 'joinedAt', width: 20 },
+  ];
+
+  memberColumns.forEach((col, index) => {
+    const column = membersSheet.getColumn(index + 1);
+    column.width = col.width;
+    column.key = col.key;
+  });
+
+  const memLastCol = String.fromCharCode(64 + memberColumns.length);
+  membersSheet.mergeCells(`A1:${memLastCol}1`);
+  membersSheet.mergeCells(`A2:${memLastCol}2`);
+
+  const memHeaderRow = 3;
+  const memHeader = membersSheet.getRow(memHeaderRow);
+  memberColumns.forEach((col, index) => {
+    memHeader.getCell(index + 1).value = col.header;
+  });
+  styleHeaderRow(membersSheet, memHeaderRow, memberColumns.length);
+
+  // Flatten all team members into rows
+  const memDataStart = 4;
+  let memberRowIndex = 0;
+  teams.forEach((team) => {
+    // Add leader as first member row
+    if (team.leaderId) {
+      const row = membersSheet.getRow(memDataStart + memberRowIndex);
+      row.values = [
+        memberRowIndex + 1,
+        team.name,
+        team.status.charAt(0).toUpperCase() + team.status.slice(1),
+        team.leaderId.name || 'N/A',
+        team.leaderId.email || 'N/A',
+        team.leaderId.department || 'N/A',
+        (team.leaderId as any).year || 'N/A',
+        'Leader',
+        team.createdAt ? new Date(team.createdAt).toLocaleString() : 'N/A',
+      ];
+      memberRowIndex++;
+    }
+
+    // Add all other members
+    (team.members || []).forEach((member) => {
+      // Skip if this member is the leader (already added above)
+      const memberId = member.userId?._id;
+      const leaderId = team.leaderId?._id;
+      if (memberId && leaderId && memberId === leaderId) return;
+
+      const row = membersSheet.getRow(memDataStart + memberRowIndex);
+      row.values = [
+        memberRowIndex + 1,
+        team.name,
+        team.status.charAt(0).toUpperCase() + team.status.slice(1),
+        member.userId?.name || 'N/A',
+        member.userId?.email || 'N/A',
+        member.userId?.department || 'N/A',
+        (member.userId as any)?.year || 'N/A',
+        member.role === 'leader' ? 'Leader' : 'Member',
+        member.joinedAt ? new Date(member.joinedAt).toLocaleString() : 'N/A',
+      ];
+      memberRowIndex++;
+    });
+  });
+
+  const memDataEnd = memDataStart + memberRowIndex - 1;
+  if (memberRowIndex > 0) {
+    styleDataRows(membersSheet, memDataStart, memDataEnd, memberColumns.length);
+
+    // Style team role column
+    const roleIdx = memberColumns.findIndex(c => c.key === 'teamRole') + 1;
+    for (let rowNum = memDataStart; rowNum <= memDataEnd; rowNum++) {
+      const roleCell = membersSheet.getRow(rowNum).getCell(roleIdx);
+      if (roleCell.value === 'Leader') {
+        roleCell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF2CC' },
+        };
+        roleCell.font = { ...FONTS.bold, color: { argb: '7F6003' } };
+      }
+    }
+
+    // Style team status column
+    const teamStatusIdx = memberColumns.findIndex(c => c.key === 'teamStatus') + 1;
+    for (let rowNum = memDataStart; rowNum <= memDataEnd; rowNum++) {
+      const cell = membersSheet.getRow(rowNum).getCell(teamStatusIdx);
+      const val = cell.value?.toString()?.toLowerCase() || '';
+      if (val === 'complete' || val === 'registered') {
+        styleStatusCell(cell, 'confirmed');
+      } else if (val === 'forming') {
+        styleStatusCell(cell, 'pending');
+      } else if (val === 'disqualified') {
+        styleStatusCell(cell, 'rejected');
+      }
+    }
+
+    addSummaryRow(membersSheet, memDataEnd + 2, 'Total Members:', memberRowIndex, memberColumns.length);
+  }
 }
 
 /**

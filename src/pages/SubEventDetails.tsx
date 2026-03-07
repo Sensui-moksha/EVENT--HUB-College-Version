@@ -729,7 +729,13 @@ const SubEventDetails: React.FC = () => {
         };
       });
 
-      await exportAttendeesToExcel(formattedAttendees, subEvent?.title || 'SubEvent');
+      // Pass teams data for the Teams Registration sheet if it's a team event
+      await exportAttendeesToExcel(
+        formattedAttendees,
+        subEvent?.title || 'SubEvent',
+        subEvent?.status,
+        subEvent?.isTeamEvent ? allTeams : undefined,
+      );
       addToast({ type: 'success', title: 'Attendees exported successfully!' });
     } catch (error) {
       console.error('Export failed:', error);
