@@ -1132,7 +1132,35 @@ const EventDetails: React.FC = () => {
         status: p.status,
         approvalType: p.approvalType || undefined
       }));
-      await exportParticipantsToExcel(participantsForExport, event?.title || 'Event');
+
+      // Build team map for export if this is a team event
+      const teamMapForExport = event?.isTeamEvent && Object.keys(userTeamMap).length > 0
+        ? Object.fromEntries(
+            Object.entries(userTeamMap).map(([uid, info]) => [uid, { teamName: info.teamName, role: info.role }])
+          )
+        : undefined;
+
+      // Fetch teams data for the Teams Registration sheet if it's a team event
+      let teamsData: any[] | undefined;
+      if (event?.isTeamEvent) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/events/${id}/teams`);
+          if (response.ok) {
+            const data = await response.json();
+            teamsData = data.teams || [];
+          }
+        } catch (e) {
+          console.error('Failed to fetch teams for export:', e);
+        }
+      }
+
+      await exportParticipantsToExcel(
+        participantsForExport,
+        event?.title || 'Event',
+        event?.status,
+        teamMapForExport,
+        teamsData,
+      );
       
       addToast({
         type: 'success',
