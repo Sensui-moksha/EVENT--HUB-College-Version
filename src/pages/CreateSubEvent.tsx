@@ -24,6 +24,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { pageVariants } from '../utils/animations';
+import AlertModal from '../components/AlertModal';
 
 // Helper function to get full image URL for relative paths
 const getFullImageUrl = (url: string): string => {
@@ -94,6 +95,8 @@ const CreateSubEvent: React.FC = () => {
   const [isTeamEvent, setIsTeamEvent] = useState<boolean>(false);
   const [minTeamSize, setMinTeamSize] = useState<number>(2);
   const [maxTeamSize, setMaxTeamSize] = useState<number>(4);
+  const [showBlockedAlert, setShowBlockedAlert] = useState(false);
+  const [blockedReason, setBlockedReason] = useState<'completed' | 'cancelled'>('completed');
 
   // Fetch parent event data
   useEffect(() => {
@@ -104,6 +107,14 @@ const CreateSubEvent: React.FC = () => {
         if (response.ok) {
           const event = await response.json();
           setParentEvent(event);
+
+          // Block creation for completed/cancelled events
+          if (event.status === 'completed' || event.status === 'cancelled') {
+            setBlockedReason(event.status as 'completed' | 'cancelled');
+            setShowBlockedAlert(true);
+            return;
+          }
+
           // Auto-populate date and venue from parent event
           setFormData(prev => ({
             ...prev,
@@ -1091,6 +1102,21 @@ const CreateSubEvent: React.FC = () => {
           </div>
         </form>
       </div>
+
+      {/* Alert for completed/cancelled events */}
+      <AlertModal
+        isOpen={showBlockedAlert}
+        onClose={() => {
+          setShowBlockedAlert(false);
+          navigate(`/events/${eventId}`);
+        }}
+        title={blockedReason === 'cancelled' ? 'Event Cancelled' : 'Event Completed'}
+        message={blockedReason === 'cancelled'
+          ? 'This event has been cancelled. Sub-events cannot be created for cancelled events. You will be redirected back to the event page.'
+          : 'This event has been marked as completed. Sub-events cannot be created for completed events. You will be redirected back to the event page.'}
+        variant={blockedReason === 'cancelled' ? 'danger' : 'warning'}
+        buttonText="Go Back"
+      />
     </motion.div>
   );
 };

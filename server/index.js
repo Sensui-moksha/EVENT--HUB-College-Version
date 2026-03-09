@@ -8088,6 +8088,14 @@ app.post('/api/events/:eventId/sub-events', async (req, res) => {
       return res.status(404).json({ error: 'Parent event not found' });
     }
 
+    // Block sub-event creation for completed or cancelled events
+    if (parentEvent.status === 'completed') {
+      return res.status(400).json({ error: 'Cannot create sub-events for a completed event' });
+    }
+    if (parentEvent.status === 'cancelled') {
+      return res.status(400).json({ error: 'Cannot create sub-events for a cancelled event' });
+    }
+
     // Inherit maxParticipants from parent event
     const maxParticipants = parentEvent.maxParticipants;
 

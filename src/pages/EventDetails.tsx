@@ -3862,6 +3862,7 @@ const EventDetails: React.FC = () => {
           <SubEventsList 
             eventId={id!} 
             canCreateSubEvent={isPrivileged} 
+            eventStatus={event.status}
           />
         </motion.div>
 

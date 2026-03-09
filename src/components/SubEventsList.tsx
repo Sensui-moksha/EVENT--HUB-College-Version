@@ -2,21 +2,27 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SubEvent } from '../types/subEvent';
 import SubEventCard from './SubEventCard';
-import { Plus, Calendar, Grid, List } from 'lucide-react';
+import { Plus, Calendar, Grid, List, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { API_BASE_URL } from '../utils/api';
+import AlertModal from './AlertModal';
 
 interface SubEventsListProps {
   eventId: string;
   canCreateSubEvent?: boolean;
+  eventStatus?: string;
 }
 
-export default function SubEventsList({ eventId, canCreateSubEvent = false }: SubEventsListProps) {
+export default function SubEventsList({ eventId, canCreateSubEvent = false, eventStatus }: SubEventsListProps) {
   const navigate = useNavigate();
   const [subEvents, setSubEvents] = useState<SubEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [showCompletedAlert, setShowCompletedAlert] = useState(false);
+
+  const isEventCompleted = eventStatus === 'completed';
+  const isEventCancelled = eventStatus === 'cancelled';
 
   useEffect(() => {
     fetchSubEvents();
@@ -126,10 +132,20 @@ export default function SubEventsList({ eventId, canCreateSubEvent = false }: Su
           {/* Create Button */}
           {canCreateSubEvent && (
             <button
-              onClick={() => navigate(`/events/${eventId}/create-sub-event`)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors shadow-md hover:shadow-lg"
+              onClick={() => {
+                if (isEventCompleted || isEventCancelled) {
+                  setShowCompletedAlert(true);
+                } else {
+                  navigate(`/events/${eventId}/create-sub-event`);
+                }
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors shadow-md hover:shadow-lg ${
+                isEventCompleted || isEventCancelled
+                  ? 'bg-gray-400 cursor-not-allowed text-white/80'
+                  : 'bg-blue-500 hover:bg-blue-600 text-white'
+              }`}
             >
-              <Plus className="w-4 h-4" />
+              {isEventCompleted || isEventCancelled ? <Lock className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
               <span>Create Sub-Event</span>
             </button>
           )}
@@ -151,10 +167,20 @@ export default function SubEventsList({ eventId, canCreateSubEvent = false }: Su
           </p>
           {canCreateSubEvent && filterStatus === 'all' && (
             <button
-              onClick={() => navigate(`/events/${eventId}/create-sub-event`)}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors shadow-md hover:shadow-lg font-medium"
+              onClick={() => {
+                if (isEventCompleted || isEventCancelled) {
+                  setShowCompletedAlert(true);
+                } else {
+                  navigate(`/events/${eventId}/create-sub-event`);
+                }
+              }}
+              className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg transition-colors shadow-md hover:shadow-lg font-medium ${
+                isEventCompleted || isEventCancelled
+                  ? 'bg-gray-400 cursor-not-allowed text-white/80'
+                  : 'bg-blue-500 hover:bg-blue-600 text-white'
+              }`}
             >
-              <Plus className="w-5 h-5" />
+              {isEventCompleted || isEventCancelled ? <Lock className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
               <span>Create Sub-Event</span>
             </button>
           )}
@@ -177,6 +203,18 @@ export default function SubEventsList({ eventId, canCreateSubEvent = false }: Su
           ))}
         </motion.div>
       )}
+
+      {/* Alert for completed/cancelled events */}
+      <AlertModal
+        isOpen={showCompletedAlert}
+        onClose={() => setShowCompletedAlert(false)}
+        title={isEventCancelled ? 'Event Cancelled' : 'Event Completed'}
+        message={isEventCancelled
+          ? 'This event has been cancelled. You cannot create new sub-events for a cancelled event.'
+          : 'This event has been marked as completed. You cannot create new sub-events for a completed event.'}
+        variant={isEventCancelled ? 'danger' : 'warning'}
+        buttonText="Got it"
+      />
     </div>
   );
 }
