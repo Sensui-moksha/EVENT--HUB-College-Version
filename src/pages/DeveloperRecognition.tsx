@@ -23,36 +23,36 @@ const DeveloperRecognition: React.FC = () => {
   const developers = [
     {
       id: 1,
-      name: 'Lead Developer',
-      role: 'Full Stack Architecture',
-      skills: ['React', 'TypeScript', 'Node.js', 'MongoDB', 'Tailwind CSS'],
-      contributions: ['Core Architecture', 'API Design', 'Database Schema'],
-      avatar: '👨‍💻',
-      github: 'https://github.com',
+      name: 'D. MOKSHYAGNA YADAV',
+      role: 'Team Lead & Full Stack Developer',
+      skills: ['React', 'TypeScript', 'Node.js', 'MongoDB', 'System Architecture'],
+      contributions: ['Project Architecture', 'Backend Infrastructure', 'Database Design', 'Team Coordination'],
+      avatar: '👨‍💼',
+      github: 'https://github.com/Sensui-moksha',
       linkedin: 'https://linkedin.com',
-      email: 'dev@example.com'
+      email: 'mokshyagna@example.com'
     },
     {
       id: 2,
-      name: 'Frontend Specialist',
-      role: 'UI/UX & Component Development',
-      skills: ['React', 'Framer Motion', 'Tailwind CSS', 'TypeScript'],
-      contributions: ['Component Library', 'Animation System', 'Responsive Design'],
-      avatar: '🎨',
-      github: 'https://github.com',
+      name: 'NANDURI NEELA NAGA SAI',
+      role: 'Full Stack Developer',
+      skills: ['React', 'TypeScript', 'Express.js', 'UI/UX', 'Responsive Design'],
+      contributions: ['Frontend Development', 'API Integration', 'Component Design', 'Performance Optimization'],
+      avatar: '👨‍💻',
+      github: 'https://github.com/Amevrynx',
       linkedin: 'https://linkedin.com',
-      email: 'frontend@example.com'
+      email: 'nanduri@example.com'
     },
     {
       id: 3,
-      name: 'Backend Specialist',
-      role: 'Server Logic & Database',
-      skills: ['Node.js', 'Express', 'MongoDB', 'Authentication', 'API'],
-      contributions: ['REST APIs', 'Database Optimization', 'Security'],
-      avatar: '⚙️',
-      github: 'https://github.com',
+      name: 'CHIRUMAMILLA AVINASH',
+      role: 'Full Stack Developer',
+      skills: ['React', 'MongoDB', 'Node.js', 'Authentication', 'Database Optimization'],
+      contributions: ['Backend Logic', 'Database Management', 'Security Implementation', 'Testing & Debugging'],
+      avatar: '👨‍💻',
+      github: 'https://github.com/Avinash657333',
       linkedin: 'https://linkedin.com',
-      email: 'backend@example.com'
+      email: 'avinash@example.com'
     },
   ];
 
@@ -134,7 +134,7 @@ const DeveloperRecognition: React.FC = () => {
             variants={itemVariants}
             className="text-lg text-gray-600 max-w-2xl mx-auto"
           >
-            Meet the talented developers who built EventHub College with passion, skill, and dedication to excellence.
+            Meet the talented team behind EventHub College - three dedicated developers who collaborated and shared equally in building this amazing platform with passion and excellence.
           </motion.p>
         </motion.div>
 
@@ -362,7 +362,7 @@ const DeveloperRecognition: React.FC = () => {
             className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-105"
           >
             <Heart className="w-5 h-5" />
-            <span>Made with passion for EventHub</span>
+            <span>Built with teamwork & passion</span>
             <Zap className="w-5 h-5" />
           </motion.div>
 
@@ -370,7 +370,7 @@ const DeveloperRecognition: React.FC = () => {
             variants={itemVariants}
             className="text-gray-600 mt-6 max-w-2xl mx-auto"
           >
-            EventHub is powered by a dedicated team of developers committed to delivering excellence. Thank you for using our platform! 🎉
+            EventHub College is the result of dedicated teamwork and collaborative effort. Three developers, one mission - to create an exceptional event management platform for the college community. Thank you for being part of this journey! 🎉
           </motion.p>
         </motion.div>
       </motion.div>
