@@ -5,12 +5,12 @@ import { useNotifications } from '../contexts/NotificationContext';
 import ManualRefreshButton from './ManualRefreshButton';
 import NotificationDrawer from './NotificationDrawer';
 import { motion } from 'framer-motion';
-import { 
-  Calendar, 
-  Home, 
-  User, 
-  LogOut, 
-  Bell, 
+import {
+  Calendar,
+  Home,
+  User,
+  LogOut,
+  Bell,
   Plus,
   Menu,
   X,
@@ -20,7 +20,8 @@ import {
   BarChart3,
   Megaphone,
   Shield,
-  Images
+  Images,
+  Code2
 } from 'lucide-react';
 
 const Navbar: React.FC = () => {
@@ -272,6 +273,17 @@ const Navbar: React.FC = () => {
                   onClearAll={clearAllNotifications}
                 />
 
+                {/* Developer Recognition Icon */}
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => navigate('/developer-recognition')}
+                  title="Developer Recognition"
+                  className="relative p-2 sm:p-2.5 text-gray-600 hover:text-purple-600 hover:bg-gray-50 rounded-lg transition-all duration-300 touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+                >
+                  <Code2 className="w-5 h-5 sm:w-6 sm:h-6" />
+                </motion.button>
+
                 {/* Refresh Controls - Only show on larger screens */}
                 <div className="hidden xl:flex items-center space-x-1">
                   <ManualRefreshButton showText={false} />
@@ -421,6 +433,15 @@ const Navbar: React.FC = () => {
                 >
                   Register
                 </Link>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => navigate('/developer-recognition')}
+                  title="Developer Recognition"
+                  className="p-2 sm:p-2.5 text-gray-600 hover:text-purple-600 hover:bg-gray-50 rounded-lg transition-all duration-300 touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+                >
+                  <Code2 className="w-5 h-5 sm:w-6 sm:h-6" />
+                </motion.button>
               </div>
             )}
 

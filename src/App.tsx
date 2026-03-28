@@ -1,5 +1,4 @@
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
-import { useEffect, useState } from 'react';
 import { Component, ReactNode } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -41,6 +40,7 @@ import GalleryDetail from './pages/GalleryDetail';
 import GalleryManager from './pages/GalleryManager';
 import JoinTeam from './pages/JoinTeam';
 import ExternalAPI from './pages/ExternalAPI';
+import DeveloperRecognition from './pages/DeveloperRecognition';
 
 // Simple error boundary
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: any }> {
@@ -125,29 +125,6 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
-// Scroll progress bar for mobile screens
-function ScrollProgressBar() {
-  const [scroll, setScroll] = useState(0);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.scrollY;
-      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = docHeight > 0 ? (scrollTop / docHeight) : 0;
-      setScroll(progress);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // Only show on mobile screens
-  return (
-    <div className="lg:hidden fixed top-0 left-0 w-full z-[60] pointer-events-none">
-      <div className="h-1.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-b-full shadow-lg transition-all duration-300" style={{ width: `${scroll * 100}%` }} />
-    </div>
-  );
-}
 function AnimatedRoutes() {
   const location = useLocation();
   
@@ -321,6 +298,11 @@ function AnimatedRoutes() {
             <ExternalAPI />
           </ErrorBoundary>
         } />
+        <Route path="/developer-recognition" element={
+          <ErrorBoundary>
+            <DeveloperRecognition />
+          </ErrorBoundary>
+        } />
       </Routes>
     </AnimatePresence>
   );
@@ -336,7 +318,6 @@ function App() {
               <EventProvider>
                 <Router>
                   <ScrollToTop />
-                  <ScrollProgressBar />
                   <ConnectionStatusBanner />
                   <div className="min-h-screen flex flex-col">
                     <Navbar />
