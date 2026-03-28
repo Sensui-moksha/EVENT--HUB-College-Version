@@ -325,7 +325,7 @@ function App() {
                       <AnimatedRoutes />
                     </main>
                     <BottomNav />
-                    <OverlayFooter />
+                    {/* <OverlayFooter /> */}
                     {/* Background job progress toasts */}
                     <BackgroundJobToast />
                   </div>
