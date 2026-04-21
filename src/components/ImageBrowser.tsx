@@ -60,6 +60,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
         setImages(data);
       }
     } catch (error) {
+      console.error('Failed to fetch images:', error);
     } finally {
       setLoading(false);
     }
@@ -154,6 +155,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
         alert(error.message || 'Failed to upload image');
       }
     } catch (error) {
+      console.error('Upload failed:', error);
       alert('Failed to upload image. Please try again.');
     } finally {
       setUploading(false);
@@ -200,6 +202,7 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
         alert(error.message || 'Failed to delete image');
       }
     } catch (error) {
+      console.error('Delete failed:', error);
       alert('Failed to delete image. Please try again.');
     } finally {
       setDeleting(null);
@@ -262,10 +265,12 @@ const ImageBrowser: React.FC<ImageBrowserProps> = ({ isOpen, onClose, onSelectIm
           deletedCount++;
         } else {
           const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('Delete failed for', image.id, errorData);
           failedIds.push(image.id);
           errors.push(`${image.filename || image.id}: ${errorData.error || errorData.details || 'Failed'}`);
         }
       } catch (error) {
+        console.error('Delete failed for', image.id, error);
         failedIds.push(image.id);
         errors.push(`${image.filename || image.id}: Network error`);
       }

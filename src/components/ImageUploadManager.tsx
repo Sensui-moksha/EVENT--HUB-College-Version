@@ -112,6 +112,7 @@ const ImageUploadManager: React.FC<Props> = ({
           setScale(1);
           setCropOpen(true);
         } catch (err) {
+          console.error('Failed to load external image for editing:', err);
           alert('Failed to load image for editing. The image URL may be inaccessible or invalid.');
         }
       }
@@ -131,6 +132,7 @@ const ImageUploadManager: React.FC<Props> = ({
       const t = await generateThumbnail(f, 512);
       setDimensions({ width: t.width, height: t.height });
     } catch (err) {
+      console.warn('Thumbnail generation failed', err);
     }
   };
 

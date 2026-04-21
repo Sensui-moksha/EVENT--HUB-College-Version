@@ -111,6 +111,7 @@ class CacheManager {
       };
     } catch (e) {
       // BroadcastChannel not supported in this browser
+      console.warn('BroadcastChannel not supported:', e);
     }
   }
 
@@ -274,7 +275,7 @@ class CacheManager {
       }
       keysToRemove.forEach(key => localStorage.removeItem(key));
     } catch (e) {
-      // Ignore cleanup errors
+      console.warn('localStorage cleanup failed:', e);
     }
     
     // Broadcast to other tabs
@@ -400,7 +401,7 @@ class CacheManager {
         return JSON.parse(raw);
       }
     } catch (e) {
-      // Ignore write errors
+      console.warn('Failed to read from localStorage:', e);
     }
     return null;
   }
@@ -420,7 +421,7 @@ class CacheManager {
     try {
       localStorage.removeItem(this.storagePrefix + key);
     } catch (e) {
-      // Ignore remove errors
+      console.warn('Failed to remove from localStorage:', e);
     }
   }
 
@@ -433,7 +434,7 @@ class CacheManager {
         }
       }
     } catch (e) {
-      // Ignore clear errors
+      console.warn('Failed to clear localStorage:', e);
     }
   }
 
@@ -449,7 +450,7 @@ class CacheManager {
         }
       }
     } catch (e) {
-      // Ignore cleanup errors
+      console.warn('localStorage cleanup failed:', e);
     }
   }
 
@@ -466,7 +467,7 @@ class CacheManager {
       try {
         callback();
       } catch (e) {
-        // Ignore listener errors
+        console.error('Cache listener error:', e);
       }
     });
   }

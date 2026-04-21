@@ -54,6 +54,7 @@ const WaitingListManager: React.FC<WaitingListManagerProps> = ({ eventId, onUpda
       const data = await response.json();
       setPendingRegistrations(data.registrations || []);
     } catch (error: any) {
+      console.error('Error fetching pending registrations:', error);
       addToast({
         type: 'error',
         title: 'Error',
@@ -95,6 +96,7 @@ const WaitingListManager: React.FC<WaitingListManagerProps> = ({ eventId, onUpda
       await fetchPendingRegistrations();
       onUpdate?.();
     } catch (error: any) {
+      console.error('Error approving registration:', error);
       addToast({
         type: 'error',
         title: 'Error',
@@ -139,6 +141,7 @@ const WaitingListManager: React.FC<WaitingListManagerProps> = ({ eventId, onUpda
       setRejectionReason('');
       onUpdate?.();
     } catch (error: any) {
+      console.error('Error rejecting registration:', error);
       addToast({
         type: 'error',
         title: 'Error',

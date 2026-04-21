@@ -9,6 +9,7 @@ export function registerServiceWorker() {
       navigator.serviceWorker
         .register('/sw.js', { scope: '/' })
         .then((registration) => {
+          // ...removed console log for production...
           
           // Check for updates periodically
           setInterval(() => {

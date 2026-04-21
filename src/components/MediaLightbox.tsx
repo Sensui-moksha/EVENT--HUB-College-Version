@@ -99,7 +99,7 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, initialInde
         video.load();
         video.currentTime = currentPos;
         if (wasPlayingBeforeError) {
-          video.play().catch(() => {});
+          video.play().catch(console.warn);
         }
       }
     };
@@ -576,6 +576,7 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, initialInde
                 const bufferedAhead = getBufferedAhead(e.currentTarget as HTMLVideoElement);
                 if (bufferedAhead > 1) {
                   // We have buffer, keep playing
+                  console.log('Video error but buffer available:', bufferedAhead.toFixed(1), 'seconds');
                   setNetworkError(true);
                 } else if (!isOnline) {
                   // Offline and no buffer - show error

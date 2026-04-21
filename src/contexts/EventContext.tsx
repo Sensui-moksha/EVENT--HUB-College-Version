@@ -116,6 +116,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
       
       await fetchEventsFromServer();
     } catch (error) {
+      console.error('Failed to fetch events:', error);
       setEvents([]);
     }
   };
@@ -217,6 +218,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
       // Update existing events with new counts
       setEvents((prev) => enrichWithSubEventCounts(prev as any[], Object.fromEntries(results.map(r => [r.id, r.count])) as Record<string, number>));
     } catch (err) {
+      console.warn('updateSubEventCounts error', err);
     }
   };
 
@@ -257,9 +259,11 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
         cacheManager.set(cacheKeys.registrations(), data.registrations, { ttl: CACHE_TTL.REGISTRATIONS });
         setRegistrations(data.registrations);
       } else {
+        console.warn('Registrations response shape unexpected:', data);
         setRegistrations([]); // Set empty array on unexpected response
       }
     } catch (error) {
+      console.error('Failed to fetch registrations from server:', error);
       setRegistrations([]); // Set empty array on error
       // Check connection status when fetch fails
       checkConnection();

@@ -36,6 +36,7 @@ export const sendOTP = async (
     const data = await response.json();
     return data;
   } catch (error) {
+    console.error('Error sending OTP:', error);
     return {
       success: false,
       error: 'Failed to send OTP. Please check your connection.',
@@ -61,6 +62,7 @@ export const verifyOTP = async (
     const data = await response.json();
     return data;
   } catch (error) {
+    console.error('Error verifying OTP:', error);
     return {
       success: false,
       error: 'Failed to verify OTP. Please try again.',
@@ -86,6 +88,7 @@ export const resendOTP = async (
     const data = await response.json();
     return data;
   } catch (error) {
+    console.error('Error resending OTP:', error);
     return {
       success: false,
       error: 'Failed to resend OTP. Please try again.',
@@ -108,6 +111,7 @@ export const checkOTPStatus = async (
     const data = await response.json();
     return data;
   } catch (error) {
+    console.error('Error checking OTP status:', error);
     return {
       success: false,
       error: 'Failed to check OTP status.',

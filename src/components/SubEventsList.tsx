@@ -41,6 +41,7 @@ export default function SubEventsList({ eventId, canCreateSubEvent = false, even
         setSubEvents([]);
       }
     } catch (error) {
+      console.error('Error fetching sub-events:', error);
       setSubEvents([]);
     } finally {
       setLoading(false);

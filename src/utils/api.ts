@@ -162,6 +162,7 @@ export const apiRequest = async (
 
     if (!response.ok) {
       const error = data?.error || `HTTP ${response.status}: ${response.statusText}`;
+      console.error(`API Error (${url}):`, error);
       throw new Error(error);
     }
 
@@ -169,15 +170,18 @@ export const apiRequest = async (
   } catch (error) {
     // Enhanced error handling for network errors
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      console.error(`Network Error (${endpoint}): Unable to connect to server. Check your internet connection.`);
       throw new Error('Unable to connect to server. Please check your internet connection and try again.');
     }
     
     // Handle DNS resolution errors
     const errorMessage = error instanceof Error ? error.message : String(error);
     if (errorMessage.includes('ERR_NAME_NOT_RESOLVED') || errorMessage.includes('ERR_NETWORK')) {
+      console.error(`DNS/Network Error (${endpoint}):`, errorMessage);
       throw new Error('Network connection lost. Please check your internet connection and try again.');
     }
     
+    console.error(`API Request failed (${endpoint}):`, error);
     throw error;
   }
 };
