@@ -16,9 +16,7 @@
 
 import NodeCache from 'node-cache';
 import redis from 'redis';
-import { createLogger } from '../utils/logger.js';
-
-const logger = createLogger('CachingStrategy');
+import logger from '../utils/logger.js';
 
 class CachingStrategy {
   constructor() {
