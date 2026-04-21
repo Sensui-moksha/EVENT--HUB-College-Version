@@ -263,6 +263,8 @@ const Register: React.FC = () => {
           title: 'Account Created!',
           message: 'Welcome to EventHub!',
         });
+        // Flag to show onboarding tutorial on first login
+        sessionStorage.setItem('just-registered', 'true');
         navigate('/'); // Redirect to Home page
       }
     } else {

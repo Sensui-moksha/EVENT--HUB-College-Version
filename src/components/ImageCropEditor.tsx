@@ -77,7 +77,6 @@ const CropEditor: React.FC<CropEditorProps> = ({ originalFile, onCancel, onSave 
       const { blob, width, height } = await createCroppedBlob(imageDataUrl, crop, zoom, croppedAreaPixels, originalFile.type);
       onSave(blob, { width, height });
     } catch (err) {
-      console.error(err);
     } finally {
       setSaving(false);
     }

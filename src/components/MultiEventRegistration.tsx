@@ -88,7 +88,6 @@ const MultiEventRegistrationComponent: React.FC<MultiEventRegistrationProps> = (
 
       onRegistrationComplete?.(result);
     } catch (error) {
-      console.error('Registration error:', error);
       addToast({ 
         type: 'error', 
         title: 'Registration Failed',

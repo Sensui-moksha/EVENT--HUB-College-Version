@@ -1,8 +1,8 @@
+import { Component, ReactNode, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
-import { Component, ReactNode } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { NotificationProvider } from './contexts/NotificationContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EventProvider } from './contexts/EventContext.tsx';
 import { ConnectionProvider } from './contexts/ConnectionContext';
 import { ToastProvider } from './components/ui/Toast';
@@ -10,8 +10,8 @@ import BackgroundJobToast from './components/BackgroundJobToast';
 import ConnectionStatusBanner from './components/ConnectionStatusBanner';
 import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
-import OverlayFooter from './components/OverlayFooter';
 import ScrollToTop from './components/ScrollToTop';
+import OnboardingTutorial from './components/OnboardingTutorial';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -51,8 +51,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   static getDerivedStateFromError(error: any) {
     return { hasError: true, error };
   }
-  componentDidCatch(error: any, errorInfo: any) {
-    // ...removed console log for production...
+  componentDidCatch() {
+    // Error caught silently for production
   }
   render() {
     if (this.state.hasError) {
@@ -308,6 +308,40 @@ function AnimatedRoutes() {
   );
 }
 
+// Component to manage tutorial state
+function AppContent() {
+  const { user } = useAuth();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    // Show onboarding if user just registered (check sessionStorage for registration flag)
+    const justRegistered = sessionStorage.getItem('just-registered');
+    if (justRegistered === 'true' && user) {
+      setShowOnboarding(true);
+      sessionStorage.removeItem('just-registered');
+    }
+  }, [user]);
+
+  return (
+    <>
+      <ScrollToTop />
+      <ConnectionStatusBanner />
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-1 pb-16 lg:pb-0">
+          <AnimatedRoutes />
+        </main>
+        <BottomNav />
+        <BackgroundJobToast />
+      </div>
+      <OnboardingTutorial
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+      />
+    </>
+  );
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -317,18 +351,7 @@ function App() {
             <NotificationProvider>
               <EventProvider>
                 <Router>
-                  <ScrollToTop />
-                  <ConnectionStatusBanner />
-                  <div className="min-h-screen flex flex-col">
-                    <Navbar />
-                    <main className="flex-1 pb-16 lg:pb-0">
-                      <AnimatedRoutes />
-                    </main>
-                    <BottomNav />
-                    {/* <OverlayFooter /> */}
-                    {/* Background job progress toasts */}
-                    <BackgroundJobToast />
-                  </div>
+                  <AppContent />
                 </Router>
               </EventProvider>
             </NotificationProvider>

@@ -2,17 +2,22 @@
  * Server-side Cache Service
  * 
  * Provides centralized caching for API responses to handle high traffic (1000+ users).
- * Uses node-cache for in-memory caching with TTL support.
+ * Supports both Redis (distributed) and node-cache (local) with automatic fallback.
  * 
  * Features:
+ * - Redis support with automatic fallback to node-cache
  * - In-memory caching with configurable TTL
  * - Cache invalidation by key or pattern
  * - ETag support for conditional requests
  * - Statistics tracking
  * - Automatic cleanup of expired entries
+ * 
+ * Configuration:
+ * - Set REDIS_URL or REDIS_CONNECTION_STRING env var to use Redis
+ * - Falls back to node-cache if Redis is unavailable
  */
 
-import NodeCache from 'node-cache';
+import cachingStrategy from './cachingStrategy.js';
 
 // TTL values in seconds
 export const CACHE_TTL = {
@@ -30,65 +35,63 @@ export const CACHE_TTL = {
 
 class ServerCacheService {
   constructor() {
-    this.cache = new NodeCache({
-      stdTTL: 60, // Default TTL: 1 minute
-      checkperiod: 120, // Check for expired keys every 2 minutes
-      useClones: false, // Don't clone data for performance
-      deleteOnExpire: true,
-      maxKeys: 10000, // Max 10k cached items
-    });
-
-    // Track cache statistics
-    this.stats = {
-      hits: 0,
-      misses: 0,
-      sets: 0,
-      invalidations: 0,
-    };
-
-    // Log cache stats periodically in development
-    if (process.env.NODE_ENV !== 'production') {
-      setInterval(() => {
-        const cacheStats = this.cache.getStats();
-        console.log('Cache Stats:', {
-          ...this.stats,
-          keys: cacheStats.keys,
-          hits: cacheStats.hits,
-          misses: cacheStats.misses,
-          ksize: cacheStats.ksize,
-          vsize: cacheStats.vsize,
-        });
-      }, 60000); // Log every minute
-    }
+    this.strategy = cachingStrategy;
   }
 
   /**
-   * Get cached value
+   * Get cached value (sync wrapper for node-cache)
    * @param {string} key - Cache key
    * @returns {any} Cached value or undefined
    */
   get(key) {
-    const value = this.cache.get(key);
-    if (value !== undefined) {
-      this.stats.hits++;
-      return value;
+    // Synchronous wrapper - returns from node-cache immediately
+    // For Redis + async usage, use getAsync()
+    if (this.strategy.nodeCache) {
+      return this.strategy.nodeCache.get(key);
     }
-    this.stats.misses++;
     return undefined;
   }
 
   /**
-   * Set cached value
+   * Get cached value (async version with Redis support)
+   * @param {string} key - Cache key
+   * @returns {Promise<any>} Cached value or undefined
+   */
+  async getAsync(key) {
+    return await this.strategy.get(key);
+  }
+
+  /**
+   * Set cached value (sync wrapper for node-cache)
+   * Also queues Redis set asynchronously
    * @param {string} key - Cache key
    * @param {any} value - Value to cache
    * @param {number} ttl - TTL in seconds (optional)
    */
   set(key, value, ttl) {
-    this.stats.sets++;
-    if (ttl) {
-      return this.cache.set(key, value, ttl);
+    // Synchronous set to node-cache
+    if (this.strategy.nodeCache) {
+      if (ttl) {
+        this.strategy.nodeCache.set(key, value, ttl);
+      } else {
+        this.strategy.nodeCache.set(key, value);
+      }
     }
-    return this.cache.set(key, value);
+    // Async set to Redis (fire and forget)
+    this.strategy.set(key, value, ttl).catch(err => {
+      console.error(`Error setting cache key ${key}:`, err.message);
+    });
+  }
+
+  /**
+   * Set cached value (async version with full Redis support)
+   * @param {string} key - Cache key
+   * @param {any} value - Value to cache
+   * @param {number} ttl - TTL in seconds (optional)
+   * @returns {Promise<boolean>}
+   */
+  async setAsync(key, value, ttl) {
+    return await this.strategy.set(key, value, ttl);
   }
 
   /**
@@ -96,8 +99,19 @@ class ServerCacheService {
    * @param {string} key - Cache key
    */
   del(key) {
-    this.stats.invalidations++;
-    return this.cache.del(key);
+    // Async delete (fire and forget)
+    this.strategy.del(key).catch(err => {
+      console.error(`Error deleting cache key ${key}:`, err.message);
+    });
+  }
+
+  /**
+   * Delete specific cache key (async version)
+   * @param {string} key - Cache key
+   * @returns {Promise<boolean>}
+   */
+  async delAsync(key) {
+    return await this.strategy.del(key);
   }
 
   /**
@@ -105,27 +119,37 @@ class ServerCacheService {
    * @param {string|RegExp} pattern - Pattern to match
    */
   invalidatePattern(pattern) {
-    const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
-    const keys = this.cache.keys();
-    let count = 0;
-    
-    for (const key of keys) {
-      if (regex.test(key)) {
-        this.cache.del(key);
-        count++;
-      }
-    }
-    
-    this.stats.invalidations += count;
-    return count;
+    // Async invalidation (fire and forget)
+    this.strategy.invalidatePattern(pattern).catch(err => {
+      console.error('Error invalidating pattern:', err.message);
+    });
+  }
+
+  /**
+   * Delete all keys matching a pattern (async version)
+   * @param {string|RegExp} pattern - Pattern to match
+   * @returns {Promise<number>}
+   */
+  async invalidatePatternAsync(pattern) {
+    return await this.strategy.invalidatePattern(pattern);
   }
 
   /**
    * Clear all cache
    */
   flush() {
-    this.stats.invalidations++;
-    this.cache.flushAll();
+    // Async flush (fire and forget)
+    this.strategy.flush().catch(err => {
+      console.error('Error flushing cache:', err.message);
+    });
+  }
+
+  /**
+   * Clear all cache (async version)
+   * @returns {Promise<boolean>}
+   */
+  async flushAsync() {
+    return await this.strategy.flush();
   }
 
   /**
@@ -134,28 +158,30 @@ class ServerCacheService {
    * @returns {string} ETag hash
    */
   generateETag(value) {
-    const str = JSON.stringify(value);
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    return `"${Math.abs(hash).toString(16)}"`;
+    return this.strategy.generateETag(value);
   }
 
   /**
    * Get cache statistics
    */
   getStats() {
-    const nodeStats = this.cache.getStats();
-    return {
-      ...this.stats,
-      keys: nodeStats.keys,
-      hitRate: this.stats.hits + this.stats.misses > 0
-        ? (this.stats.hits / (this.stats.hits + this.stats.misses) * 100).toFixed(2) + '%'
-        : '0%',
-    };
+    return this.strategy.stats;
+  }
+
+  /**
+   * Get cache statistics (async version with Redis info)
+   * @returns {Promise<Object>}
+   */
+  async getStatsAsync() {
+    return await this.strategy.getStats();
+  }
+
+  /**
+   * Check cache health
+   * @returns {Promise<Object>}
+   */
+  async healthCheck() {
+    return await this.strategy.healthCheck();
   }
 }
 

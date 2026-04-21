@@ -37,7 +37,6 @@ const Comments: React.FC<CommentsProps> = ({ eventId, eventStatus }) => {
       // Ensure data is an array
       setComments(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error fetching comments:', error);
       setComments([]); // Set empty array on error
     } finally {
       setLoading(false);
@@ -66,7 +65,6 @@ const Comments: React.FC<CommentsProps> = ({ eventId, eventStatus }) => {
         setReplyTo(null);
       }
     } catch (error) {
-      console.error('Error posting comment:', error);
     } finally {
       setPosting(false);
     }

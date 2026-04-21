@@ -46,7 +46,6 @@ export default function EmailSettings({ userId, onUpdate }: EmailSettingsProps) 
         const data = await response.json();
         setPreferences(data.emailPreferences || preferences);
       } catch (error) {
-        console.error('Error fetching email settings:', error);
         setToast({ 
           message: 'Failed to load email settings. Using defaults.', 
           type: 'error' 
@@ -97,7 +96,6 @@ export default function EmailSettings({ userId, onUpdate }: EmailSettingsProps) 
         onUpdate(data.emailPreferences);
       }
     } catch (error) {
-      console.error('Error updating email settings:', error);
       setToast({ 
         message: 'Failed to update email settings. Please try again.', 
         type: 'error' 

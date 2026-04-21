@@ -59,7 +59,6 @@ const Navbar: React.FC = () => {
             setPendingUsersCount(data.count || 0);
           }
         } catch (error) {
-          console.error('Failed to fetch pending users count');
         }
       }
     };

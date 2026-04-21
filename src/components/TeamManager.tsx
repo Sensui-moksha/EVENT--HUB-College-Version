@@ -212,7 +212,6 @@ const TeamManager: React.FC<TeamManagerProps> = ({
         }
       }
     } catch (error) {
-      console.error('Error fetching team data:', error);
     } finally {
       setLoading(false);
     }
@@ -367,7 +366,6 @@ const TeamManager: React.FC<TeamManagerProps> = ({
         setNonPlatformInvite(data.nonPlatformInvite || null);
       }
     } catch (error) {
-      console.error('Error searching users:', error);
     } finally {
       setSearching(false);
     }

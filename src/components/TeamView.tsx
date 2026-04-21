@@ -49,7 +49,6 @@ const TeamView: React.FC<TeamViewProps> = ({ eventId, refreshTrigger }) => {
         setTeams([]);
       }
     } catch (error) {
-      console.error('Error fetching teams:', error);
       setTeams([]);
     } finally {
       setLoading(false);

@@ -4,7 +4,6 @@ import {
   Code2,
   GithubIcon,
   LinkedinIcon,
-  Mail,
   Award,
   Zap,
   Heart,
@@ -29,8 +28,8 @@ const DeveloperRecognition: React.FC = () => {
       contributions: ['Project Architecture', 'Backend Infrastructure', 'Database Design', 'Team Coordination'],
       avatar: '👨‍💼',
       github: 'https://github.com/Sensui-moksha',
-      linkedin: 'https://linkedin.com',
-      email: 'mokshyagna@example.com'
+      linkedin: 'https://www.linkedin.com/in/mokshyagnayadav/',
+      portfolio: 'https://sensui-moksha.github.io/'
     },
     {
       id: 2,
@@ -40,8 +39,8 @@ const DeveloperRecognition: React.FC = () => {
       contributions: ['Frontend Development', 'API Integration', 'Component Design', 'Performance Optimization'],
       avatar: '👨‍💻',
       github: 'https://github.com/Amevrynx',
-      linkedin: 'https://linkedin.com',
-      email: 'nanduri@example.com'
+      linkedin: 'https://www.linkedin.com/in/nagasainanduri/',
+      portfolio: 'https://amevrynx.github.io/'
     },
     {
       id: 3,
@@ -51,8 +50,8 @@ const DeveloperRecognition: React.FC = () => {
       contributions: ['Backend Logic', 'Database Management', 'Security Implementation', 'Testing & Debugging'],
       avatar: '👨‍💻',
       github: 'https://github.com/Avinash657333',
-      linkedin: 'https://linkedin.com',
-      email: 'avinash@example.com'
+      linkedin: 'https://www.linkedin.com/in/ch-avinash-7726aa1b3/',
+      portfolio: ''
     },
   ];
 
@@ -270,15 +269,19 @@ const DeveloperRecognition: React.FC = () => {
                           >
                             <LinkedinIcon className="w-5 h-5 text-gray-700 hover:text-blue-600" />
                           </motion.a>
-                          <motion.a
-                            href={`mailto:${developer.email}`}
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="p-2 bg-gray-100 hover:bg-blue-100 rounded-lg transition-colors"
-                            title="Email"
-                          >
-                            <Mail className="w-5 h-5 text-gray-700 hover:text-blue-600" />
-                          </motion.a>
+                          {developer.portfolio && (
+                            <motion.a
+                              href={developer.portfolio}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="p-2 bg-gray-100 hover:bg-blue-100 rounded-lg transition-colors"
+                              title="Portfolio"
+                            >
+                              <Heart className="w-5 h-5 text-gray-700 hover:text-blue-600" />
+                            </motion.a>
+                          )}
                         </div>
                       </motion.div>
 

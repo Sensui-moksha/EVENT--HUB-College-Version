@@ -16,7 +16,8 @@ import {
   Megaphone,
   Shield,
   UserCog,
-  Images
+  Images,
+  Code2
 } from 'lucide-react';
 
 const BottomNav: React.FC = () => {
@@ -65,6 +66,7 @@ const BottomNav: React.FC = () => {
       moreMenuItems.push({ path: '/admin-users', label: 'Manage Users', icon: UserCog });
     }
     moreMenuItems.push(
+      { path: '/developer-recognition', label: 'About Developers', icon: Code2 },
       { path: '/profile', label: 'My Profile', icon: User },
       { path: '/notification-preferences', label: 'Notification Settings', icon: Bell },
       { path: '/privacy-settings', label: 'Privacy Settings', icon: Shield }

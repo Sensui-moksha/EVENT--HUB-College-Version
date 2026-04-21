@@ -4,12 +4,14 @@
  * High-performance caching system for gallery media (images/videos).
  * Uses a multi-tier caching strategy:
  * 
- * 1. In-Memory Cache (Hot tier) - Most frequently accessed media
- * 2. HTTP Cache Headers - Browser/CDN caching
- * 3. ETag/Conditional Requests - Prevents re-downloads
+ * 1. In-Memory Cache (Hot tier) - Most frequently accessed media (node-cache)
+ * 2. Redis Metadata Cache - ETags and metadata across instances
+ * 3. HTTP Cache Headers - Browser/CDN caching
+ * 4. ETag/Conditional Requests - Prevents re-downloads
  * 
  * Features:
- * - LRU (Least Recently Used) eviction policy
+ * - LRU (Least Recently Used) eviction policy for media files
+ * - Distributed metadata caching with Redis
  * - Automatic cache warming for popular media
  * - Cache corruption detection and auto-repair
  * - Memory-efficient streaming for large files
@@ -18,6 +20,7 @@
 
 import NodeCache from 'node-cache';
 import crypto from 'crypto';
+import cachingStrategy from './cachingStrategy.js';
 
 // ==================== CONFIGURATION ====================
 const CONFIG = {
@@ -54,7 +57,7 @@ const CONFIG = {
 // ==================== MEDIA CACHE CLASS ====================
 class MediaCacheService {
   constructor() {
-    // In-memory cache for media files (hot cache)
+    // In-memory cache for media files (hot cache - large binary data)
     this.mediaCache = new NodeCache({
       stdTTL: CONFIG.MEDIA_TTL,
       checkperiod: CONFIG.CHECK_PERIOD,
@@ -63,7 +66,7 @@ class MediaCacheService {
       maxKeys: CONFIG.MAX_ITEMS,
     });
 
-    // Metadata cache (lightweight info about media)
+    // Metadata cache (lightweight info about media - synced with Redis)
     this.metadataCache = new NodeCache({
       stdTTL: CONFIG.METADATA_TTL,
       checkperiod: CONFIG.CHECK_PERIOD,
@@ -72,13 +75,16 @@ class MediaCacheService {
       maxKeys: CONFIG.MAX_ITEMS * 2,
     });
 
-    // ETag cache (for conditional requests)
+    // ETag cache (for conditional requests - synced with Redis)
     this.etagCache = new NodeCache({
       stdTTL: CONFIG.MEDIA_TTL,
       checkperiod: CONFIG.CHECK_PERIOD,
       useClones: false,
       maxKeys: CONFIG.MAX_ITEMS * 2,
     });
+
+    // Reference to caching strategy for distributed metadata
+    this.strategy = cachingStrategy;
 
     // Track current cache size
     this.currentCacheSize = 0;
@@ -91,6 +97,8 @@ class MediaCacheService {
       bytesCached: 0,
       evictions: 0,
       corruptions: 0,
+      redisMetadataHits: 0,
+      redisMetadataMisses: 0,
     };
 
     // Access frequency tracking for LRU
@@ -103,6 +111,7 @@ class MediaCacheService {
     setInterval(() => this._performHealthCheck(), 10 * 60 * 1000); // Every 10 minutes
 
     console.log(`[MediaCache] Initialized with ${CONFIG.MAX_CACHE_SIZE / (1024 * 1024)}MB max size`);
+    console.log(`[MediaCache] Using Redis for distributed metadata caching: ${this.strategy.isRedisAvailable ? 'Yes' : 'No'}`);
   }
 
   /**
@@ -210,21 +219,100 @@ class MediaCacheService {
         size,
       });
 
-      // Cache ETag
+      // Cache ETag (both locally and in Redis)
       const etag = this.generateETag(buffer, fileName);
       this.etagCache.set(`etag:${fileName}`, etag);
+      this._setETagInRedis(fileName, etag, ttl);
 
-      // Cache metadata
+      // Cache metadata (both locally and in Redis)
       if (metadata) {
-        this.metadataCache.set(`meta:${fileName}`, {
+        const metaData = {
           ...metadata,
           size,
           cachedAt: Date.now(),
-        });
+        };
+        this.metadataCache.set(`meta:${fileName}`, metaData);
+        this._setMetadataInRedis(fileName, metaData, CONFIG.METADATA_TTL);
       }
     }
 
     return success;
+  }
+
+  /**
+   * Set ETag in Redis for distributed access
+   * @private
+   */
+  _setETagInRedis(fileName, etag, ttl) {
+    this.strategy.set(`media:etag:${fileName}`, etag, ttl).catch(err => {
+      console.warn(`[MediaCache] Failed to cache ETag in Redis: ${err.message}`);
+    });
+  }
+
+  /**
+   * Set metadata in Redis for distributed access
+   * @private
+   */
+  _setMetadataInRedis(fileName, metadata, ttl) {
+    this.strategy.set(`media:meta:${fileName}`, metadata, ttl).catch(err => {
+      console.warn(`[MediaCache] Failed to cache metadata in Redis: ${err.message}`);
+    });
+  }
+
+  /**
+   * Get ETag from local cache or Redis
+   */
+  async getETagAsync(fileName) {
+    // Try local cache first
+    let etag = this.etagCache.get(`etag:${fileName}`);
+    if (etag) {
+      this.stats.hits++;
+      return etag;
+    }
+
+    // Try Redis
+    try {
+      etag = await this.strategy.get(`media:etag:${fileName}`);
+      if (etag) {
+        this.stats.redisMetadataHits++;
+        // Cache locally
+        this.etagCache.set(`etag:${fileName}`, etag, CONFIG.MEDIA_TTL);
+        return etag;
+      }
+    } catch (err) {
+      console.warn(`[MediaCache] Failed to get ETag from Redis: ${err.message}`);
+    }
+
+    this.stats.misses++;
+    return null;
+  }
+
+  /**
+   * Get metadata from local cache or Redis
+   */
+  async getMetadataAsync(fileName) {
+    // Try local cache first
+    let metadata = this.metadataCache.get(`meta:${fileName}`);
+    if (metadata) {
+      this.stats.hits++;
+      return metadata;
+    }
+
+    // Try Redis
+    try {
+      metadata = await this.strategy.get(`media:meta:${fileName}`);
+      if (metadata) {
+        this.stats.redisMetadataHits++;
+        // Cache locally
+        this.metadataCache.set(`meta:${fileName}`, metadata, CONFIG.METADATA_TTL);
+        return metadata;
+      }
+    } catch (err) {
+      console.warn(`[MediaCache] Failed to get metadata from Redis: ${err.message}`);
+    }
+
+    this.stats.redisMetadataMisses++;
+    return null;
   }
 
   /**
@@ -260,23 +348,9 @@ class MediaCacheService {
   }
 
   /**
-   * Get ETag for media
-   */
-  getETag(fileName) {
-    return this.etagCache.get(`etag:${fileName}`);
-  }
-
-  /**
-   * Get metadata for media
-   */
-  getMetadata(fileName) {
-    return this.metadataCache.get(`meta:${fileName}`);
-  }
-
-  /**
    * Invalidate (delete) cached media
    */
-  invalidate(fileName) {
+  async invalidateAsync(fileName) {
     const key = this._getCacheKey(fileName);
     const cached = this.mediaCache.get(key);
 
@@ -289,13 +363,21 @@ class MediaCacheService {
     this.metadataCache.del(`meta:${fileName}`);
     this.accessFrequency.delete(key);
 
+    // Also invalidate in Redis
+    try {
+      await this.strategy.del(`media:etag:${fileName}`);
+      await this.strategy.del(`media:meta:${fileName}`);
+    } catch (err) {
+      console.warn(`[MediaCache] Failed to invalidate in Redis: ${err.message}`);
+    }
+
     console.log(`[MediaCache] Invalidated: ${fileName}`);
   }
 
   /**
    * Invalidate all media for an event
    */
-  invalidateByEvent(eventId) {
+  async invalidateByEventAsync(eventId) {
     let count = 0;
     const keys = this.mediaCache.keys();
 
@@ -319,6 +401,14 @@ class MediaCacheService {
       }
     }
 
+    // Invalidate in Redis
+    try {
+      await this.strategy.invalidatePatternAsync(`media:etag:${eventId}:*`);
+      await this.strategy.invalidatePatternAsync(`media:meta:${eventId}:*`);
+    } catch (err) {
+      console.warn(`[MediaCache] Failed to invalidate event in Redis: ${err.message}`);
+    }
+
     console.log(`[MediaCache] Invalidated ${count} items for event ${eventId}`);
     return count;
   }
@@ -326,17 +416,51 @@ class MediaCacheService {
   /**
    * Clear all cache
    */
-  clear() {
+  async clearAsync() {
     this.mediaCache.flushAll();
     this.metadataCache.flushAll();
     this.etagCache.flushAll();
     this.accessFrequency.clear();
     this.currentCacheSize = 0;
+
+    // Also clear Redis
+    try {
+      await this.strategy.invalidatePatternAsync('media:*');
+    } catch (err) {
+      console.warn(`[MediaCache] Failed to clear Redis: ${err.message}`);
+    }
+
     console.log('[MediaCache] Cache cleared');
   }
 
   /**
    * Get cache statistics
+   */
+  async getStatsAsync() {
+    const nodeStats = this.mediaCache.getStats();
+    const redisMetadataHitRate = this.stats.redisMetadataHits + this.stats.redisMetadataMisses > 0
+      ? ((this.stats.redisMetadataHits / (this.stats.redisMetadataHits + this.stats.redisMetadataMisses)) * 100).toFixed(2)
+      : 0;
+    
+    const mediaHitRate = this.stats.hits + this.stats.misses > 0
+      ? ((this.stats.hits / (this.stats.hits + this.stats.misses)) * 100).toFixed(2)
+      : 0;
+
+    return {
+      ...this.stats,
+      mediaHitRate: `${mediaHitRate}%`,
+      redisMetadataHitRate: `${redisMetadataHitRate}%`,
+      currentSize: `${(this.currentCacheSize / (1024 * 1024)).toFixed(2)} MB`,
+      maxSize: `${(CONFIG.MAX_CACHE_SIZE / (1024 * 1024)).toFixed(2)} MB`,
+      itemCount: nodeStats.keys,
+      metadataCount: this.metadataCache.keys().length,
+      utilizationPercent: ((this.currentCacheSize / CONFIG.MAX_CACHE_SIZE) * 100).toFixed(2),
+      redisAvailable: this.strategy.isRedisAvailable,
+    };
+  }
+
+  /**
+   * Get cache statistics (sync version - less detailed)
    */
   getStats() {
     const nodeStats = this.mediaCache.getStats();
@@ -353,6 +477,36 @@ class MediaCacheService {
       metadataCount: this.metadataCache.keys().length,
       utilizationPercent: ((this.currentCacheSize / CONFIG.MAX_CACHE_SIZE) * 100).toFixed(2),
     };
+  }
+
+  /**
+   * Backward compatible methods (sync versions)
+   */
+  invalidate(fileName) {
+    this.invalidateAsync(fileName).catch(err => {
+      console.error(`[MediaCache] Error invalidating ${fileName}:`, err.message);
+    });
+  }
+
+  invalidateByEvent(eventId) {
+    this.invalidateByEventAsync(eventId).catch(err => {
+      console.error(`[MediaCache] Error invalidating event ${eventId}:`, err.message);
+    });
+    return 0; // Async operation
+  }
+
+  clear() {
+    this.clearAsync().catch(err => {
+      console.error('[MediaCache] Error clearing cache:', err.message);
+    });
+  }
+
+  async getETag(fileName) {
+    return await this.getETagAsync(fileName);
+  }
+
+  async getMetadata(fileName) {
+    return await this.getMetadataAsync(fileName);
   }
 
   /**

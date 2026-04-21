@@ -217,7 +217,6 @@ export default function CalendarComponent() {
           setFetchedEvents(processed);
         }
       } catch (err) {
-        console.error('Failed to fetch events for calendar fallback', err);
         if (!cancelled) setFetchedEvents([]);
       }
     };
@@ -243,7 +242,6 @@ export default function CalendarComponent() {
       })) as Event[];
       setFetchedEvents(processed);
     } catch (err) {
-      console.error('Refetch failed', err);
     }
   };
 

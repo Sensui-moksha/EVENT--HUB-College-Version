@@ -1178,6 +1178,9 @@ const systemSettingsSchema = new mongoose.Schema({
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   updatedAt: { type: Date, default: Date.now }
 });
+// Add indexes for SystemSettings schema
+systemSettingsSchema.index({ key: 1 }); // For key lookups
+systemSettingsSchema.index({ updatedAt: -1 }); // For sorting by update date
 const SystemSettings = mongoose.model('SystemSettings', systemSettingsSchema);
 
 // Helper function to get system setting
@@ -1620,6 +1623,14 @@ const scanLogSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 });
 
+// Add indexes for ScanLog schema
+scanLogSchema.index({ registrationId: 1 }); // For QR scan lookups
+scanLogSchema.index({ eventId: 1 }); // For event-specific scans
+scanLogSchema.index({ userId: 1 }); // For user-specific scans
+scanLogSchema.index({ scannedAt: -1 }); // For sorting by scan time
+scanLogSchema.index({ eventId: 1, scannedAt: -1 }); // For event scan history
+scanLogSchema.index({ registrationId: 1, scannedAt: -1 }); // For registration scan history
+
 const ScanLog = mongoose.model('ScanLog', scanLogSchema);
 
 // Waitlist Schema
@@ -1671,6 +1682,8 @@ const notificationPreferencesSchema = new mongoose.Schema({
     announcements: { type: Boolean, default: true }
   }
 });
+// Add indexes for NotificationPreferences schema
+notificationPreferencesSchema.index({ userId: 1 }); // For user lookups
 const NotificationPreferences = mongoose.model('NotificationPreferences', notificationPreferencesSchema);
 
 // Friend Schema
@@ -1680,6 +1693,11 @@ const friendSchema = new mongoose.Schema({
   status: { type: String, enum: ['pending', 'accepted', 'blocked'], default: 'pending' },
   createdAt: { type: Date, default: Date.now }
 });
+// Add indexes for Friend schema
+friendSchema.index({ userId: 1, status: 1 }); // For user's friends list
+friendSchema.index({ friendId: 1, status: 1 }); // For incoming friend requests
+friendSchema.index({ userId: 1, friendId: 1 }, { unique: true }); // Prevent duplicate relationships
+friendSchema.index({ createdAt: -1 }); // For sorting by creation date
 const Friend = mongoose.model('Friend', friendSchema);
 
 // Team Schema - For event team registrations

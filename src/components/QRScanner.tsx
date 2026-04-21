@@ -79,8 +79,8 @@ const QRScanner: React.FC<QRScannerProps> = ({
             return;
           }
         } catch (error) {
-          // Permission API not available or not supported for camera
-          console.debug('Permission API not available for camera');
+          setCameraPermission('denied');
+        return;
         }
       }
 
@@ -101,7 +101,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
         }
       }
     } catch (error) {
-      console.error('Error checking camera permission:', error);
       setCameraPermission('prompt');
     }
   };
@@ -109,7 +108,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
   const requestCameraPermission = async (): Promise<boolean> => {
     try {
       setIsStartingCamera(true);
-      console.log('Requesting camera permission...');
 
       // Clear any existing permission status to force a fresh request
       setCameraPermission('checking');
@@ -126,7 +124,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
       // Stop the test stream immediately as we just needed to check permission
       stream.getTracks().forEach(track => track.stop());
       
-      console.log('Camera permission granted');
       setCameraPermission('granted');
       
       addToast({
@@ -137,7 +134,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
       
       return true;
     } catch (error: any) {
-      console.error('Camera permission error:', error);
       setCameraPermission('denied');
       
       if (error.name === 'NotAllowedError') {
@@ -159,6 +155,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
           message: 'Camera is already in use by another application.'
         });
       } else {
+        console.error('Video ref not available after timeout');
         addToast({
           type: 'error',
           title: 'Camera Error',
@@ -174,11 +171,9 @@ const QRScanner: React.FC<QRScannerProps> = ({
   const startCameraWithPreview = async () => {
     try {
       setIsStartingCamera(true);
-      console.log('Starting camera with preview...');
 
       // Stop any existing stream first
       if (streamRef.current) {
-        console.log('Stopping existing stream...');
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
       }
@@ -217,12 +212,9 @@ const QRScanner: React.FC<QRScannerProps> = ({
 
       for (let i = 0; i < cameraConfigs.length; i++) {
         try {
-          console.log(`Trying camera config ${i + 1}:`, cameraConfigs[i]);
           stream = await navigator.mediaDevices.getUserMedia(cameraConfigs[i]);
-          console.log('✅ Camera stream obtained with config', i + 1);
           break;
         } catch (error) {
-          console.warn(`❌ Camera config ${i + 1} failed:`, error);
           lastError = error;
         }
       }
@@ -230,9 +222,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
       if (!stream) {
         throw lastError || new Error('All camera configurations failed');
       }
-      
-      console.log('Camera stream obtained:', stream);
-      console.log('Video tracks:', stream.getVideoTracks());
       
       // Store the stream
       streamRef.current = stream;
@@ -244,7 +233,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
       setTimeout(() => {
         const video = miniPreviewRef.current;
         if (video) {
-          console.log('Setting up video element...');
           
           // Clear any existing src
           video.srcObject = null;
@@ -255,34 +243,27 @@ const QRScanner: React.FC<QRScannerProps> = ({
           
           // Add comprehensive event listeners
           const onLoadedMetadata = () => {
-            console.log('Video metadata loaded, dimensions:', video.videoWidth, 'x', video.videoHeight);
             video.play().then(() => {
-              console.log('Video playing successfully');
             }).catch(error => {
-              console.error('Play failed:', error);
               // Try user gesture play
               video.muted = true;
-              video.play().catch(console.error);
+              video.play().catch(() => {});
             });
           };
           
           const onCanPlay = () => {
-            console.log('Video can play');
             if (video.paused) {
-              video.play().catch(console.error);
+              video.play().catch(() => {});
             }
           };
           
           const onPlay = () => {
-            console.log('Video started playing');
           };
           
           const onError = (e: any) => {
-            console.error('Video error:', e, video.error);
           };
           
           const onLoadStart = () => {
-            console.log('Video load started');
           };
           
           // Remove any existing listeners first
@@ -306,10 +287,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
           
           // Force load
           video.load();
-          
-          console.log('Video element setup completed');
         } else {
-          console.error('Video ref not available after timeout');
         }
       }, 100);
       
@@ -435,8 +413,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
 
       scannerRef.current.render(
         (decodedText, decodedResult) => {
-          console.log('QR Code detected:', decodedText);
-          console.log('QR Result object:', decodedResult);
           // decodedResult.format does not exist on Html5QrcodeResult
           handleQRScan(decodedText);
         },
@@ -446,7 +422,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
               !error.toString().includes('No QR code found') &&
               !error.toString().includes('NotFoundException') &&
               !error.toString().includes('NotFoundError')) {
-            console.warn('QR Scanner error:', error);
           }
         }
       );
@@ -455,7 +430,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
 
   const stopScanning = () => {
     if (scannerRef.current) {
-      scannerRef.current.clear().catch(console.error);
+      scannerRef.current.clear().catch(() => {});
       scannerRef.current = null;
     }
     setIsScanning(false);
@@ -464,21 +439,13 @@ const QRScanner: React.FC<QRScannerProps> = ({
 
   const handleQRScan = async (qrData: string) => {
     try {
-      console.log('Raw QR Data scanned:', qrData);
-      console.log('QR Data length:', qrData.length);
-      console.log('QR Data type:', typeof qrData);
-      
       // Try to parse the QR data to see if it's valid JSON
       try {
         const parsed = JSON.parse(qrData);
-        console.log('Parsed QR Data:', parsed);
-        console.log('QR Data fields:', Object.keys(parsed));
       } catch (parseError: any) {
-        console.log('QR Data is not JSON:', parseError.message);
       }
       
       const result = await validateQRCode(qrData, eventId, scannedBy, location);
-      console.log('Validation result:', result);
       setScanResult(result);
       
       if (result.valid) {
@@ -498,7 +465,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
       
       onScanComplete?.(result);
     } catch (error) {
-      console.error('QR validation error:', error);
       addToast({
         type: 'error',
         title: 'Scan Error',
@@ -517,7 +483,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
       return;
     }
 
-    console.log('Manual QR Data:', manualQRData);
     await handleQRScan(manualQRData);
     setManualQRData('');
   };
@@ -551,7 +516,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
       
       try {
         const qrCodeResult = await html5QrCode.scanFile(file, true);
-        console.log('QR Code detected in image:', qrCodeResult);
         
         addToast({
           type: 'success',
@@ -563,7 +527,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
         await handleQRScan(qrCodeResult);
         
       } catch (scanError) {
-        console.error('No QR code found in image:', scanError);
         addToast({
           type: 'error',
           title: 'No QR Code Found',
@@ -574,7 +537,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
         try {
           await html5QrCode.clear();
         } catch (clearError) {
-          console.warn('Error clearing HTML5 QR code scanner:', clearError);
         }
       }
       
@@ -877,19 +839,15 @@ const QRScanner: React.FC<QRScannerProps> = ({
                 console.error('❌ Video error:', e);
                 const video = miniPreviewRef.current;
                 if (video && video.error) {
-                  console.error('Video error details:', video.error);
                 }
               }}
               onLoadStart={() => {
-                console.log('📡 Video load started');
               }}
               onWaiting={() => {
-                console.log('⏳ Video waiting for data');
               }}
               onTimeUpdate={() => {
                 // Only log first time update to avoid spam
                 if (!miniPreviewRef.current?.dataset.firstUpdate) {
-                  console.log('⏱️ Video time update - playing!');
                   if (miniPreviewRef.current) {
                     miniPreviewRef.current.dataset.firstUpdate = 'true';
                   }
